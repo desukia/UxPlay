@@ -1,0 +1,83 @@
+name: Build Google TV App (APK)
+
+on:
+  push:
+    branches: [ master, main ]
+    paths:
+      - 'android/**'
+      - 'lib/**'
+      - '.github/workflows/build-android.yml'
+  pull_request:
+    branches: [ master, main ]
+    paths:
+      - 'android/**'
+      - 'lib/**'
+      - '.github/workflows/build-android.yml'
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Tipo de build (Release, Debug ou Ambos)'
+        required: true
+        default: 'both'
+        type: choice
+        options:
+          - both
+          - release
+          - debug
+
+jobs:
+  build-apk:
+    name: Build Android TV APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Set up Android SDK & NDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install NDK and CMake
+        run: |
+          echo "y" | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager \
+            "ndk;26.1.10909125" \
+            "cmake;3.22.1" \
+            "platforms;android-34" \
+            "build-tools;34.0.0"
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x android/gradlew
+
+      - name: Build Debug APK
+        if: ${{ github.event.inputs.build_type == 'debug' || github.event.inputs.build_type == 'both' || github.event_name != 'workflow_dispatch' }}
+        working-directory: android
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Build Release APK
+        if: ${{ github.event.inputs.build_type == 'release' || github.event.inputs.build_type == 'both' || github.event_name != 'workflow_dispatch' }}
+        working-directory: android
+        run: ./gradlew assembleRelease --stacktrace
+
+      - name: Organize APK Artifacts
+        run: |
+          mkdir -p build-artifacts
+          find android/app/build/outputs/apk -name "*.apk" -exec cp {} build-artifacts/ \;
+          echo "Arquivos APK gerados:"
+          ls -lh build-artifacts/
+
+      - name: Upload APK to GitHub Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: AppleTV-AirPlay-GoogleTV-APKs
+          path: build-artifacts/*.apk
+          if-no-files-found: error
+          retention-days: 30
