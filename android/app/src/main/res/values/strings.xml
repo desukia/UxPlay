@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Apple TV AirPlay</string>
+    <string name="airplay_title">AirPlay</string>
+    <string name="ready_to_connect">Pronto para Conectar</string>
+    <string name="default_device_name">Apple TV</string>
+
+    <!-- Connect Instructions -->
+    <string name="instruction_step_1">Conecte seu iPhone, iPad ou Mac à mesma rede Wi-Fi</string>
+    <string name="instruction_step_2">Abra a Central de Controle e toque em Espelhar a Tela</string>
+    <string name="instruction_step_3">Selecione \"%1$s\" na lista de dispositivos</string>
+
+    <!-- PIN Screen -->
+    <string name="pin_title">Código do AirPlay</string>
+    <string name="pin_subtitle">Digite o código de emparelhamento no seu dispositivo Apple para continuar:</string>
+    <string name="pin_hint">Este código é temporário e protege suas transmissões.</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Ajustes da Apple TV</string>
+    <string name="category_general">Geral</string>
+    <string name="category_airplay">AirPlay e HomeKit</string>
+    <string name="category_video_audio">Vídeo e Áudio</string>
+    <string name="category_screensaver">Protetor de Tela</string>
+    <string name="category_about">Sobre</string>
+
+    <string name="setting_device_name">Nome da Apple TV</string>
+    <string name="setting_require_pin">Exigir Código de Segurança</string>
+    <string name="setting_resolution">Resolução de Espelhamento</string>
+    <string name="setting_audio_offset">Sincronização de Áudio</string>
+    <string name="setting_screensaver_theme">Tema do Protetor Aéreo</string>
+    <string name="setting_start_on_boot">Iniciar com o Google TV</string>
+
+    <string name="pin_never">Desativado</string>
+    <string name="pin_first_time">Apenas na Primeira Vez</string>
+    <string name="pin_always">Sempre Exigir</string>
+
+    <!-- Now Playing -->
+    <string name="now_playing_title">Em Reprodução</string>
+    <string name="no_track_playing">Nenhuma faixa reproduzindo</string>
+</resources>

@@ -1,4 +1,6 @@
-# UxPlay 1.74 (Experimental): AirPlay-Mirror and AirPlay-Audio server for Linux, macOS, and Unix (also runs on Windows).
+# UxPlay: AirPlay-Mirror and AirPlay-Audio server for Google TV, Android TV, Linux, macOS, Windows
+
+> 📺 **Google TV / Android TV Edition**: Veja a pasta [`android/`](android/README.md) para a versão completa adaptada para Google TV e Android TV com interface e design idênticos à **Apple TV 4K** (tvOS), incluindo protetor de tela aéreo cinemático, diálogo de código PIN em vidro fosco, tela "Em Reprodução" de música e decodificação acelerada por hardware de baixíssima latência.
 
 ### **Now developed at the GitHub site <https://github.com/FDH2/UxPlay> (where ALL user issues should be posted, and latest versions can be found).**
 

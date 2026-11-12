@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black_obsidian">#0A0A0C</color>
+    <color name="frosted_glass_bg">#331E1E24</color>
+    <color name="frosted_glass_stroke">#33FFFFFF</color>
+    <color name="card_focused">#4DFFFFFF</color>
+    <color name="text_white">#FFFFFFFF</color>
+    <color name="text_secondary">#99EBEBF5</color>
+    <color name="apple_accent">#0071E3</color>
+    <color name="apple_green">#34C759</color>
+</resources>

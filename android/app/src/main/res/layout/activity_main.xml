@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/rootContainer"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/black_obsidian"
+    android:keepScreenOn="true">
+
+    <!-- 1. Ambient / Idle Apple TV Aerial Screensaver Layer -->
+    <include
+        android:id="@+id/layoutAmbient"
+        layout="@layout/view_apple_tv_ambient"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="visible" />
+
+    <!-- 2. Active Mirroring Video Layer (Hardware SurfaceView) -->
+    <include
+        android:id="@+id/layoutMirror"
+        layout="@layout/view_apple_tv_mirror"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone" />
+
+    <!-- 3. Music Now Playing Layer -->
+    <include
+        android:id="@+id/layoutNowPlaying"
+        layout="@layout/view_apple_tv_now_playing"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone" />
+
+    <!-- 4. tvOS 4-Digit PIN Code Dialog Overlay -->
+    <include
+        android:id="@+id/layoutPinDialog"
+        layout="@layout/dialog_apple_tv_pin"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone" />
+
+    <!-- Quick Settings / Adjustments Button in Bottom Right -->
+    <LinearLayout
+        android:id="@+id/btnSettingsShortcut"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="32dp"
+        android:background="@drawable/bg_glass_pill"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="16dp"
+        android:paddingTop="10dp"
+        android:paddingEnd="20dp"
+        android:paddingBottom="10dp">
+
+        <ImageView
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:layout_marginEnd="8dp"
+            android:src="@drawable/ic_settings"
+            app:tint="@color/text_white" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Ajustes"
+            android:textColor="@color/text_white"
+            android:textSize="14sp" />
+    </LinearLayout>
+
+</FrameLayout>
