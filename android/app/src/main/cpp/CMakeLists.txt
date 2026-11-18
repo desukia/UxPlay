@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.22.1)
 project(airplay_native LANGUAGES C CXX)
 
-set(CMAKE_C_STANDARD 99)
+set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
 add_definitions(-DSTANDALONE)
@@ -54,7 +54,13 @@ if(NOT libplist_POPULATED)
         ${libplist_SOURCE_DIR}/src
         ${libplist_SOURCE_DIR}/libcnary/include
     )
-    target_compile_definitions(plist PRIVATE PACKAGE_VERSION="2.3.0")
+    target_compile_definitions(plist PRIVATE
+        PACKAGE_VERSION="2.3.0"
+        HAVE_STRNDUP=1
+        HAVE_STRPTIME=1
+        HAVE_MEMMEM=1
+    )
+    target_compile_options(plist PRIVATE -Wno-typedef-redefinition)
 endif()
 
 include_directories(
