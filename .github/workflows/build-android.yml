@@ -25,10 +25,14 @@ on:
           - release
           - debug
 
+permissions:
+  contents: read
+
 jobs:
   build-apk:
     name: Build Android TV APK
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout repository
@@ -41,18 +45,16 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-          cache: 'gradle'
 
+      # Explicitly specify packages to prevent setup-android from defaulting to the obsolete 'tools' package
       - name: Set up Android SDK & NDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools platforms;android-34 build-tools;34.0.0 ndk;26.1.10909125 cmake;3.22.1
 
-      - name: Install NDK and CMake
-        run: |
-          echo "y" | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager \
-            "ndk;26.1.10909125" \
-            "cmake;3.22.1" \
-            "platforms;android-34" \
-            "build-tools;34.0.0"
+      # Uses Gradle official action for caching and runner execution
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Make Gradle wrapper executable
         run: chmod +x android/gradlew
