@@ -12,6 +12,7 @@ add_definitions(-D__STDC_LIMIT_MACROS)
 add_definitions(-DNOHOLD)
 add_definitions(-DUSE_MDNS=1)
 add_definitions(-DOPENSSL_API_COMPAT=0x10101000L)
+add_definitions(-DPLIST_210)
 add_definitions(-DPLIST_230)
 
 set(UXPLAY_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../../../../..)
