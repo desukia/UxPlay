@@ -181,7 +181,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:text="Selecione \"Apple TV\""
+            android:text="Selecione &quot;Apple TV&quot;"
             android:textColor="@color/text_white"
             android:textSize="16sp"
             android:textStyle="bold" />
