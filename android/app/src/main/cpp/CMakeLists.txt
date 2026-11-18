@@ -19,17 +19,43 @@ set(UXPLAY_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../../../../..)
 # OpenSSL via Google Android NDK prefab package
 find_package(openssl REQUIRED CONFIG)
 
-# Include libplist via FetchContent
+# Build libplist from source via FetchContent
 include(FetchContent)
-set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build static libplist" FORCE)
-set(ENABLE_PYTHON OFF CACHE BOOL "Disable Python bindings" FORCE)
-set(ENABLE_CYTHON OFF CACHE BOOL "Disable Cython" FORCE)
 FetchContent_Declare(
     libplist
     GIT_REPOSITORY https://github.com/libimobiledevice/libplist.git
     GIT_TAG 2.3.0
 )
-FetchContent_MakeAvailable(libplist)
+FetchContent_GetProperties(libplist)
+if(NOT libplist_POPULATED)
+    FetchContent_Populate(libplist)
+
+    set(LIBPLIST_SOURCES
+        ${libplist_SOURCE_DIR}/src/base64.c
+        ${libplist_SOURCE_DIR}/src/bytearray.c
+        ${libplist_SOURCE_DIR}/src/hashtable.c
+        ${libplist_SOURCE_DIR}/src/ptrarray.c
+        ${libplist_SOURCE_DIR}/src/time64.c
+        ${libplist_SOURCE_DIR}/src/xplist.c
+        ${libplist_SOURCE_DIR}/src/bplist.c
+        ${libplist_SOURCE_DIR}/src/jsmn.c
+        ${libplist_SOURCE_DIR}/src/jplist.c
+        ${libplist_SOURCE_DIR}/src/oplist.c
+        ${libplist_SOURCE_DIR}/src/out-default.c
+        ${libplist_SOURCE_DIR}/src/out-plutil.c
+        ${libplist_SOURCE_DIR}/src/out-limd.c
+        ${libplist_SOURCE_DIR}/src/plist.c
+        ${libplist_SOURCE_DIR}/libcnary/node.c
+        ${libplist_SOURCE_DIR}/libcnary/node_list.c
+    )
+    add_library(plist STATIC ${LIBPLIST_SOURCES})
+    target_include_directories(plist PUBLIC
+        ${libplist_SOURCE_DIR}/include
+        ${libplist_SOURCE_DIR}/src
+        ${libplist_SOURCE_DIR}/libcnary/include
+    )
+    target_compile_definitions(plist PRIVATE PACKAGE_VERSION="2.3.0")
+endif()
 
 include_directories(
     .
@@ -107,7 +133,7 @@ find_library(android-lib android)
 target_link_libraries(airplay_native
     ${log-lib}
     ${android-lib}
-    plist-2.0
+    plist
     openssl::crypto
     openssl::ssl
 )

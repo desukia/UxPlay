@@ -4,6 +4,7 @@
 #include <thread>
 #include <atomic>
 #include <mutex>
+#include <chrono>
 #include <android/log.h>
 #include <cstring>
 
@@ -41,7 +42,6 @@ static std::atomic<bool> g_is_running(false);
 static std::thread g_server_thread;
 static raop_t *g_raop = nullptr;
 static dnssd_t *g_dnssd = nullptr;
-static logger_t *g_logger = nullptr;
 
 // Helper to get JNIEnv for current thread
 static JNIEnv* getJniEnv() {
@@ -172,6 +172,133 @@ static void on_pin_code_cb(void *cls, const char *pin) {
     }
 }
 
+// RAOP Callback bridge functions matching raop_callbacks_s in lib/raop.h
+static void cb_audio_process(void *cls, raop_ntp_t *ntp, audio_decode_struct *data) {
+    (void)cls;
+    (void)ntp;
+    if (data && data->data && data->data_len > 0) {
+        audio_renderer_render_buffer(data->data, &data->data_len, &data->seqnum, &data->ntp_time_remote);
+    }
+}
+
+static void cb_video_process(void *cls, raop_ntp_t *ntp, video_decode_struct *data) {
+    (void)cls;
+    (void)ntp;
+    if (data && data->data && data->data_len > 0) {
+        video_renderer_render_buffer(data->data, &data->data_len, &data->nal_count, &data->ntp_time_remote);
+    }
+}
+
+static void cb_video_pause(void *cls) {
+    (void)cls;
+    video_renderer_pause();
+}
+
+static void cb_video_resume(void *cls) {
+    (void)cls;
+    video_renderer_resume();
+}
+
+static void cb_conn_init(void *cls) {
+    (void)cls;
+    video_renderer_start();
+    audio_renderer_start(nullptr);
+}
+
+static void cb_conn_destroy(void *cls) {
+    (void)cls;
+    video_renderer_stop();
+    audio_renderer_stop();
+}
+
+static void cb_audio_flush(void *cls) {
+    (void)cls;
+    audio_renderer_flush();
+}
+
+static void cb_video_flush(void *cls) {
+    (void)cls;
+    video_renderer_flush();
+}
+
+static double cb_audio_set_client_volume(void *cls) {
+    (void)cls;
+    return 1.0;
+}
+
+static void cb_audio_set_volume(void *cls, float volume) {
+    (void)cls;
+    audio_renderer_set_volume((double)volume);
+}
+
+static void cb_audio_set_metadata(void *cls, const void *buffer, int buflen) {
+    (void)cls;
+    (void)buffer;
+    (void)buflen;
+}
+
+static void cb_audio_set_coverart(void *cls, const void *buffer, int buflen) {
+    (void)cls;
+    if (buffer && buflen > 0) {
+        jni_on_cover_art((const uint8_t*)buffer, buflen);
+    }
+}
+
+static void cb_audio_get_format(void *cls, unsigned char *ct, unsigned short *spf, bool *usingScreen, bool *isMedia, uint64_t *audioFormat) {
+    (void)cls;
+    if (ct) *ct = 1; // PCM
+    if (spf) *spf = 352;
+    if (usingScreen) *usingScreen = true;
+    if (isMedia) *isMedia = false;
+    if (audioFormat) *audioFormat = 0;
+}
+
+static void cb_display_pin(void *cls, char *pin) {
+    (void)cls;
+    on_pin_code_cb(nullptr, pin);
+}
+
+static void cb_report_client_request(void *cls, char *deviceid, char *model, char *name, bool *admit) {
+    (void)cls;
+    (void)deviceid;
+    if (admit) *admit = true;
+    jni_on_client_info(model, name);
+}
+
+static int cb_video_set_codec_and_size(void *cls, video_codec_t codec, unsigned short width_source,
+                                       unsigned short height_source, unsigned short x_offset,
+                                       unsigned short y_offset, unsigned short width, unsigned short height) {
+    (void)cls;
+    (void)codec;
+    (void)width_source;
+    (void)height_source;
+    (void)x_offset;
+    (void)y_offset;
+    (void)width;
+    (void)height;
+    return 0;
+}
+
+static void cb_conn_feedback(void *cls) { (void)cls; }
+static void cb_conn_reset(void *cls, int reason) { (void)cls; (void)reason; }
+static void cb_video_reset(void *cls, reset_type_t reset_type) { (void)cls; (void)reset_type; }
+
+// Logger bridge to Android Logcat
+static void uxplay_log_callback(void *cls, int level, const char *msg) {
+    (void)cls;
+    int android_level = ANDROID_LOG_INFO;
+    if (level <= LOGGER_ERR) {
+        android_level = ANDROID_LOG_ERROR;
+    } else if (level <= LOGGER_WARNING) {
+        android_level = ANDROID_LOG_WARN;
+    } else if (level <= LOGGER_INFO) {
+        android_level = ANDROID_LOG_INFO;
+    } else {
+        android_level = ANDROID_LOG_DEBUG;
+    }
+    __android_log_print(android_level, "UxPlayCore", "%s", msg ? msg : "");
+}
+
 extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     (void)reserved;
     g_jvm = vm;
@@ -181,6 +308,7 @@ extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_appletv_airplay_engine_NativeAirPlay_nativeInit(JNIEnv *env, jobject thiz, jobject callbacks) {
+    (void)thiz;
     std::lock_guard<std::mutex> lock(g_cb_mutex);
     if (g_callback_obj) {
         env->DeleteGlobalRef(g_callback_obj);
@@ -209,6 +337,7 @@ Java_com_appletv_airplay_engine_NativeAirPlay_nativeStartServer(
         JNIEnv *env, jobject thiz,
         jstring jserverName, jint width, jint height, jint fps,
         jboolean requirePin, jstring jfixedPin) {
+    (void)thiz;
 
     if (g_is_running.load()) {
         LOGI("Server is already running");
@@ -227,56 +356,84 @@ Java_com_appletv_airplay_engine_NativeAirPlay_nativeStartServer(
     g_is_running.store(true);
 
     g_server_thread = std::thread([sName, width, height, fps, requirePin, sPin]() {
-        netutils_init();
-
-        g_logger = logger_init();
-        logger_set_level(g_logger, LOGGER_INFO);
-
-        // Hardware Mac address emulation (00:11:22:33:44:55 or derived from TV)
-        unsigned char hw_addr[6] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55};
+        // Hardware MAC address emulation
+        char hw_addr[6] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55};
 
         raop_callbacks_t raop_cbs;
         memset(&raop_cbs, 0, sizeof(raop_cbs));
-        raop_cbs.audio_process = audio_renderer_render_buffer;
-        raop_cbs.video_process = video_renderer_render_buffer;
-        raop_cbs.audio_flush = audio_renderer_flush;
-        raop_cbs.video_flush = video_renderer_flush;
-        raop_cbs.audio_destroy = audio_renderer_destroy;
-        raop_cbs.video_destroy = video_renderer_destroy;
-        raop_cbs.audio_set_volume = audio_renderer_set_volume;
-        raop_cbs.video_set_volume = video_renderer_hls_set_volume;
+        raop_cbs.cls = nullptr;
+        raop_cbs.audio_process = cb_audio_process;
+        raop_cbs.video_process = cb_video_process;
+        raop_cbs.video_pause = cb_video_pause;
+        raop_cbs.video_resume = cb_video_resume;
+        raop_cbs.conn_feedback = cb_conn_feedback;
+        raop_cbs.conn_reset = cb_conn_reset;
+        raop_cbs.video_reset = cb_video_reset;
+        raop_cbs.video_set_codec_and_size = cb_video_set_codec_and_size;
+        raop_cbs.conn_init = cb_conn_init;
+        raop_cbs.conn_destroy = cb_conn_destroy;
+        raop_cbs.audio_flush = cb_audio_flush;
+        raop_cbs.video_flush = cb_video_flush;
+        raop_cbs.audio_set_client_volume = cb_audio_set_client_volume;
+        raop_cbs.audio_set_volume = cb_audio_set_volume;
+        raop_cbs.audio_set_metadata = cb_audio_set_metadata;
+        raop_cbs.audio_set_coverart = cb_audio_set_coverart;
+        raop_cbs.audio_get_format = cb_audio_get_format;
+        raop_cbs.display_pin = cb_display_pin;
+        raop_cbs.report_client_request = cb_report_client_request;
 
-        g_raop = raop_init(10, &raop_cbs);
+        g_raop = raop_init(&raop_cbs);
         if (!g_raop) {
             LOGE("Failed to initialize RAOP core");
             g_is_running.store(false);
             return;
         }
 
+        raop_set_log_callback(g_raop, uxplay_log_callback, nullptr);
         raop_set_log_level(g_raop, LOGGER_INFO);
+
+        const char *mac_str = "00:11:22:33:44:55";
+        const char *keyfile = "";
+        if (raop_init2(g_raop, 1, mac_str, keyfile) != 0) {
+            LOGE("Failed in raop_init2");
+            raop_destroy(g_raop);
+            g_raop = nullptr;
+            g_is_running.store(false);
+            return;
+        }
+
         raop_set_plist(g_raop, "width", width > 0 ? width : 1920);
         raop_set_plist(g_raop, "height", height > 0 ? height : 1080);
         raop_set_plist(g_raop, "maxFPS", fps > 0 ? fps : 60);
         raop_set_plist(g_raop, "refreshRate", 60);
 
+        unsigned char pin_pw = 0;
         if (requirePin) {
+            pin_pw = 1;
             if (!sPin.empty()) {
                 raop_set_plist(g_raop, "pin", std::stoi(sPin));
             } else {
-                raop_set_plist(g_raop, "pin", 1); // Random PIN
+                raop_set_plist(g_raop, "pin", 1);
             }
         }
 
-        unsigned short raop_port = 0;
+        unsigned short tcp[2] = {0, 0};
+        unsigned short udp[3] = {0, 0, 0};
+        raop_set_tcp_ports(g_raop, tcp);
+        raop_set_udp_ports(g_raop, udp);
+
+        unsigned short raop_port = raop_get_port(g_raop);
         raop_start_httpd(g_raop, &raop_port);
         raop_set_port(g_raop, raop_port);
 
-        // Start mDNS advertisement as an authentic Apple TV
-        g_dnssd = dnssd_init(g_logger);
-        if (g_dnssd) {
-            dnssd_register_raop(g_dnssd, sName.c_str(), raop_port, (const char*)hw_addr, sizeof(hw_addr));
-            dnssd_register_airplay(g_dnssd, sName.c_str(), raop_port, (const char*)hw_addr, sizeof(hw_addr));
+        int dnssd_error = 0;
+        g_dnssd = dnssd_init(sName.c_str(), (int)sName.length(), hw_addr, (int)sizeof(hw_addr), pin_pw, &dnssd_error);
+        if (g_dnssd && !dnssd_error) {
+            dnssd_register_raop(g_dnssd, raop_port);
+            dnssd_register_airplay(g_dnssd, raop_port);
             raop_set_dnssd(g_raop, g_dnssd);
+        } else {
+            LOGE("dnssd_init failed: error %d", dnssd_error);
         }
 
         LOGI("AirPlay server started as '%s' on port %d with resolution %dx%d@%d",
@@ -294,17 +451,10 @@ Java_com_appletv_airplay_engine_NativeAirPlay_nativeStartServer(
         }
 
         if (g_raop) {
-            raop_stop_httpd(g_raop);
             raop_destroy(g_raop);
             g_raop = nullptr;
         }
 
-        if (g_logger) {
-            logger_destroy(g_logger);
-            g_logger = nullptr;
-        }
-
-        netutils_cleanup();
         LOGI("AirPlay server stopped cleanly");
     });
 
@@ -313,6 +463,9 @@ Java_com_appletv_airplay_engine_NativeAirPlay_nativeStartServer(
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_appletv_airplay_engine_NativeAirPlay_nativeStopServer(JNIEnv *env, jobject thiz) {
+    (void)env;
+    (void)thiz;
+
     if (!g_is_running.load()) return;
 
     g_is_running.store(false);
@@ -324,5 +477,7 @@ Java_com_appletv_airplay_engine_NativeAirPlay_nativeStopServer(JNIEnv *env, jobj
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_appletv_airplay_engine_NativeAirPlay_nativeSetVolume(JNIEnv *env, jobject thiz, jfloat volume) {
+    (void)env;
+    (void)thiz;
     audio_renderer_set_volume((double)volume);
 }
