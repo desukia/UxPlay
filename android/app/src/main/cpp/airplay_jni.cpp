@@ -35,6 +35,7 @@ static jmethodID g_mid_onClientDisconnected = nullptr;
 static jmethodID g_mid_onVideoFrame = nullptr;
 static jmethodID g_mid_onVideoSizeChanged = nullptr;
 static jmethodID g_mid_onAudioFrame = nullptr;
+static jmethodID g_mid_onAudioProgress = nullptr;
 static jmethodID g_mid_onMetadata = nullptr;
 static jmethodID g_mid_onCoverArt = nullptr;
 static jmethodID g_mid_onVolumeChanged = nullptr;
@@ -175,6 +176,24 @@ extern "C" void jni_on_volume_changed(float volume) {
     env->CallVoidMethod(g_callback_obj, g_mid_onVolumeChanged, (jfloat)volume);
 }
 
+extern "C" void jni_on_client_disconnected() {
+    std::lock_guard<std::mutex> lock(g_cb_mutex);
+    if (!g_callback_obj || !g_mid_onClientDisconnected) return;
+    JNIEnv *env = getJniEnv();
+    if (!env) return;
+
+    env->CallVoidMethod(g_callback_obj, g_mid_onClientDisconnected);
+}
+
+extern "C" void jni_on_audio_progress(long positionMs, long durationMs) {
+    std::lock_guard<std::mutex> lock(g_cb_mutex);
+    if (!g_callback_obj || !g_mid_onAudioProgress) return;
+    JNIEnv *env = getJniEnv();
+    if (!env) return;
+
+    env->CallVoidMethod(g_callback_obj, g_mid_onAudioProgress, (jlong)positionMs, (jlong)durationMs);
+}
+
 // PIN code callback from RAOP core
 static void on_pin_code_cb(void *cls, const char *pin) {
     (void)cls;
@@ -253,6 +272,7 @@ static void cb_conn_destroy(void *cls) {
     g_video_active.store(false);
     g_audio_active.store(false);
     update_airplay_state();
+    jni_on_client_disconnected();
 }
 
 static void cb_audio_flush(void *cls) {
@@ -327,6 +347,31 @@ static void cb_audio_set_coverart(void *cls, const void *buffer, int buflen) {
     }
 }
 
+static void cb_audio_stop_coverart_rendering(void *cls) {
+    (void)cls;
+    LOGI("cb_audio_stop_coverart_rendering: Clearing cover art");
+    jni_on_cover_art(nullptr, 0);
+}
+
+static void cb_audio_set_progress(void *cls, uint32_t *start, uint32_t *curr, uint32_t *end) {
+    (void)cls;
+    if (!start || !curr || !end) return;
+    uint32_t s = *start;
+    uint32_t c = *curr;
+    uint32_t e = *end;
+
+    long durationMs = 0;
+    long positionMs = 0;
+    if (e > s) {
+        durationMs = (long)(((uint64_t)(e - s) * 1000ULL) / 44100ULL);
+    }
+    if (c >= s && e > s) {
+        positionMs = (long)(((uint64_t)(c - s) * 1000ULL) / 44100ULL);
+        if (positionMs > durationMs) positionMs = durationMs;
+    }
+    jni_on_audio_progress(positionMs, durationMs);
+}
+
 static void cb_audio_get_format(void *cls, unsigned char *ct, unsigned short *spf, bool *usingScreen, bool *isMedia, uint64_t *audioFormat) {
     (void)cls;
     (void)usingScreen;
@@ -367,11 +412,12 @@ static int cb_video_set_codec_and_size(void *cls, video_codec_t codec, unsigned 
     (void)codec;
     (void)x_offset;
     (void)y_offset;
-    int w = width > 0 ? (int)width : (int)width_source;
-    int h = height > 0 ? (int)height : (int)height_source;
+    // Physical aspect ratio is given by width_source and height_source
+    int w = (width_source > 0) ? (int)width_source : (int)width;
+    int h = (height_source > 0) ? (int)height_source : (int)height;
     if (w <= 0) w = 1920;
     if (h <= 0) h = 1080;
-    LOGI("cb_video_set_codec_and_size: active dimensions %dx%d (source %dx%d, crop %dx%d)",
+    LOGI("cb_video_set_codec_and_size: aspect dimensions %dx%d (source %dx%d, crop %dx%d)",
          w, h, width_source, height_source, width, height);
     g_current_width.store(w);
     g_current_height.store(h);
@@ -429,6 +475,7 @@ Java_com_appletv_airplay_engine_NativeAirPlay_nativeInit(JNIEnv *env, jobject th
     g_mid_onVideoFrame = env->GetMethodID(cbClass, "onVideoFrame", "([BIJI)V");
     g_mid_onVideoSizeChanged = env->GetMethodID(cbClass, "onVideoSizeChanged", "(II)V");
     g_mid_onAudioFrame = env->GetMethodID(cbClass, "onAudioFrame", "([BIIJI)V");
+    g_mid_onAudioProgress = env->GetMethodID(cbClass, "onAudioProgress", "(JJ)V");
     g_mid_onMetadata = env->GetMethodID(cbClass, "onMetadata", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V");
     g_mid_onCoverArt = env->GetMethodID(cbClass, "onCoverArt", "([B)V");
     g_mid_onVolumeChanged = env->GetMethodID(cbClass, "onVolumeChanged", "(F)V");
@@ -482,6 +529,8 @@ Java_com_appletv_airplay_engine_NativeAirPlay_nativeStartServer(
         raop_cbs.audio_set_volume = cb_audio_set_volume;
         raop_cbs.audio_set_metadata = cb_audio_set_metadata;
         raop_cbs.audio_set_coverart = cb_audio_set_coverart;
+        raop_cbs.audio_stop_coverart_rendering = cb_audio_stop_coverart_rendering;
+        raop_cbs.audio_set_progress = cb_audio_set_progress;
         raop_cbs.audio_get_format = cb_audio_get_format;
         raop_cbs.mirror_video_running = cb_mirror_video_running;
         raop_cbs.display_pin = cb_display_pin;

@@ -40,6 +40,14 @@ object NativeAirPlay {
     private val _videoSizeFlow = MutableStateFlow(Pair(1920, 1080))
     val videoSizeFlow = _videoSizeFlow.asStateFlow()
 
+    data class AudioProgress(
+        val positionMs: Long = 0L,
+        val durationMs: Long = 0L
+    )
+
+    private val _progressFlow = MutableStateFlow(AudioProgress())
+    val progressFlow = _progressFlow.asStateFlow()
+
     // Raw frame listeners for Decoders
     var videoFrameListener: ((data: ByteArray, length: Int, timestampNs: Long, nalCount: Int) -> Unit)? = null
     var audioFrameListener: ((data: ByteArray, length: Int, format: Int, timestampNs: Long, seqNum: Int) -> Unit)? = null
@@ -53,6 +61,7 @@ object NativeAirPlay {
         fun onVideoFrame(data: ByteArray, length: Int, timestampNs: Long, nalCount: Int)
         fun onVideoSizeChanged(width: Int, height: Int)
         fun onAudioFrame(data: ByteArray, length: Int, format: Int, timestampNs: Long, seqNum: Int)
+        fun onAudioProgress(positionMs: Long, durationMs: Long)
         fun onMetadata(title: String, artist: String, album: String)
         fun onCoverArt(jpegData: ByteArray)
         fun onVolumeChanged(volume: Float)
@@ -91,6 +100,7 @@ object NativeAirPlay {
             Log.i(TAG, "Client disconnected")
             _clientInfoFlow.value = AirPlayClientInfo()
             _metadataFlow.value = TrackMetadata()
+            _progressFlow.value = AudioProgress()
             _pinCodeFlow.value = null
             _stateFlow.value = AirPlayState.IDLE
         }
@@ -106,6 +116,10 @@ object NativeAirPlay {
 
         override fun onAudioFrame(data: ByteArray, length: Int, format: Int, timestampNs: Long, seqNum: Int) {
             audioFrameListener?.invoke(data, length, format, timestampNs, seqNum)
+        }
+
+        override fun onAudioProgress(positionMs: Long, durationMs: Long) {
+            _progressFlow.value = AudioProgress(positionMs, durationMs)
         }
 
         override fun onMetadata(title: String, artist: String, album: String) {

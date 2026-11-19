@@ -3,7 +3,10 @@ package com.appletv.airplay
 import android.animation.ObjectAnimator
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.RenderEffect
+import android.graphics.Shader
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
@@ -62,7 +65,9 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
 
     // Now Playing Views
     private lateinit var imgAlbumCover: ImageView
+    private lateinit var imgDefaultMusicIcon: ImageView
     private lateinit var imgAmbientGlow: ImageView
+    private lateinit var txtAirPlayBadge: TextView
     private lateinit var txtTrackTitle: TextView
     private lateinit var txtArtistName: TextView
     private lateinit var txtAlbumName: TextView
@@ -128,7 +133,9 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
 
         // Now Playing
         imgAlbumCover = findViewById(R.id.imgAlbumCover)
+        imgDefaultMusicIcon = findViewById(R.id.imgDefaultMusicIcon)
         imgAmbientGlow = findViewById(R.id.imgAmbientGlow)
+        txtAirPlayBadge = findViewById(R.id.txtAirPlayBadge)
         txtTrackTitle = findViewById(R.id.txtTrackTitle)
         txtArtistName = findViewById(R.id.txtArtistName)
         txtAlbumName = findViewById(R.id.txtAlbumName)
@@ -197,6 +204,9 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
             NativeAirPlay.clientInfoFlow.collectLatest { info ->
                 if (info.deviceName.isNotEmpty()) {
                     showHud("${info.deviceName} conectado")
+                    txtAirPlayBadge.text = "AirPlay • ${info.deviceName}"
+                } else {
+                    txtAirPlayBadge.text = "AirPlay Áudio"
                 }
             }
         }
@@ -205,16 +215,52 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
             NativeAirPlay.metadataFlow.collectLatest { metadata ->
                 if (metadata.title.isNotEmpty()) {
                     txtTrackTitle.text = metadata.title
-                    txtArtistName.text = metadata.artist
+                    txtArtistName.text = metadata.artist.ifEmpty { "Desconhecido" }
                     txtAlbumName.text = metadata.album
 
                     metadata.coverArtBytes?.let { bytes ->
-                        val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                        if (bitmap != null) {
-                            imgAlbumCover.setImageBitmap(bitmap)
-                            imgAmbientGlow.setImageBitmap(bitmap)
+                        if (bytes.isNotEmpty()) {
+                            val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                            if (bitmap != null) {
+                                imgDefaultMusicIcon.visibility = View.GONE
+                                imgAlbumCover.visibility = View.VISIBLE
+                                imgAlbumCover.setImageBitmap(bitmap)
+                                applyAmbientGlow(bitmap)
+                            } else {
+                                resetCoverArt()
+                            }
+                        } else {
+                            resetCoverArt()
                         }
+                    } ?: run {
+                        resetCoverArt()
                     }
+                } else {
+                    resetCoverArt()
+                }
+            }
+        }
+
+        lifecycleScope.launch {
+            NativeAirPlay.progressFlow.collectLatest { progress ->
+                val pos = progress.positionMs
+                val dur = progress.durationMs
+                if (dur > 0) {
+                    val fraction = (pos.toDouble() / dur.toDouble()).coerceIn(0.0, 1.0)
+                    audioProgressBar.isIndeterminate = false
+                    audioProgressBar.progress = (fraction * 1000).toInt()
+                    txtElapsedTime.text = formatTime(pos)
+                    txtRemainingTime.text = "-" + formatTime((dur - pos).coerceAtLeast(0))
+                } else if (pos > 0) {
+                    audioProgressBar.isIndeterminate = false
+                    audioProgressBar.progress = 1000
+                    txtElapsedTime.text = formatTime(pos)
+                    txtRemainingTime.text = ""
+                } else {
+                    audioProgressBar.isIndeterminate = false
+                    audioProgressBar.progress = 0
+                    txtElapsedTime.text = "0:00"
+                    txtRemainingTime.text = "--:--"
                 }
             }
         }
@@ -271,6 +317,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         layoutPinDialog.visibility = View.GONE
         videoDecoder.stop()
         audioPlayer.stop()
+        resetCoverArt()
 
         val prefs = getSharedPreferences("apple_tv_prefs", Context.MODE_PRIVATE)
         val name = prefs.getString("device_name", "Apple TV") ?: "Apple TV"
@@ -304,12 +351,115 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         isMirroringActive = false
         layoutPinDialog.visibility = View.GONE
         layoutAmbient.visibility = View.GONE
-        layoutMirror.visibility = View.VISIBLE
+        layoutMirror.visibility = View.GONE
         layoutNowPlaying.visibility = View.VISIBLE
 
         videoDecoder.stop()
         audioPlayer.start()
         soundManager.playConnectSound()
+    }
+
+    private fun applyAmbientGlow(bitmap: Bitmap) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val smallBitmap = Bitmap.createScaledBitmap(bitmap, 128, 128, true)
+                imgAmbientGlow.setImageBitmap(smallBitmap)
+                val blurEffect = RenderEffect.createBlurEffect(120f, 120f, Shader.TileMode.CLAMP)
+                imgAmbientGlow.setRenderEffect(blurEffect)
+            } else {
+                val blurred = createBlurredBitmap(bitmap, radius = 20, scale = 0.12f)
+                imgAmbientGlow.setImageBitmap(blurred)
+            }
+            imgAmbientGlow.animate().alpha(0.55f).setDuration(400).start()
+        } catch (e: Exception) {
+            Log.w("MainActivity", "Failed to apply ambient glow effect", e)
+            imgAmbientGlow.setImageBitmap(bitmap)
+            imgAmbientGlow.alpha = 0.45f
+        }
+    }
+
+    private fun resetCoverArt() {
+        imgAlbumCover.setImageDrawable(null)
+        imgAlbumCover.visibility = View.INVISIBLE
+        imgDefaultMusicIcon.visibility = View.VISIBLE
+        imgAmbientGlow.animate().alpha(0f).setDuration(300).withEndAction {
+            imgAmbientGlow.setImageDrawable(null)
+        }.start()
+        audioProgressBar.progress = 0
+        txtElapsedTime.text = "0:00"
+        txtRemainingTime.text = "--:--"
+    }
+
+    private fun formatTime(ms: Long): String {
+        val totalSec = ms / 1000
+        val min = totalSec / 60
+        val sec = totalSec % 60
+        return String.format(Locale.getDefault(), "%d:%02d", min, sec)
+    }
+
+    private fun createBlurredBitmap(src: Bitmap, radius: Int, scale: Float): Bitmap {
+        val width = (src.width * scale).toInt().coerceAtLeast(16)
+        val height = (src.height * scale).toInt().coerceAtLeast(16)
+        val small = Bitmap.createScaledBitmap(src, width, height, true)
+        val pixels = IntArray(width * height)
+        small.getPixels(pixels, 0, width, 0, 0, width, height)
+        boxBlurPass(pixels, width, height, radius)
+        boxBlurPass(pixels, width, height, radius)
+        return Bitmap.createBitmap(pixels, width, height, Bitmap.Config.ARGB_8888)
+    }
+
+    private fun boxBlurPass(pixels: IntArray, w: Int, h: Int, r: Int) {
+        val wm = w - 1
+        val hm = h - 1
+        val wh = w * h
+        val div = 2 * r + 1
+        val rsum = IntArray(wh)
+        val gsum = IntArray(wh)
+        val bsum = IntArray(wh)
+
+        for (y in 0 until h) {
+            var curR = 0
+            var curG = 0
+            var curB = 0
+            for (i in -r..r) {
+                val p = pixels[y * w + i.coerceIn(0, wm)]
+                curR += (p shr 16) and 0xFF
+                curG += (p shr 8) and 0xFF
+                curB += p and 0xFF
+            }
+            for (x in 0 until w) {
+                val idx = y * w + x
+                rsum[idx] = curR / div
+                gsum[idx] = curG / div
+                bsum[idx] = curB / div
+                val pOut = pixels[y * w + (x - r).coerceIn(0, wm)]
+                val pIn = pixels[y * w + (x + r + 1).coerceIn(0, wm)]
+                curR += ((pIn shr 16) and 0xFF) - ((pOut shr 16) and 0xFF)
+                curG += ((pIn shr 8) and 0xFF) - ((pOut shr 8) and 0xFF)
+                curB += (pIn and 0xFF) - (pOut and 0xFF)
+            }
+        }
+
+        for (x in 0 until w) {
+            var curR = 0
+            var curG = 0
+            var curB = 0
+            for (i in -r..r) {
+                val idx = i.coerceIn(0, hm) * w + x
+                curR += rsum[idx]
+                curG += gsum[idx]
+                curB += bsum[idx]
+            }
+            for (y in 0 until h) {
+                val idx = y * w + x
+                pixels[idx] = (0xFF shl 24) or ((curR / div) shl 16) or ((curG / div) shl 8) or (curB / div)
+                val idxOut = (y - r).coerceIn(0, hm) * w + x
+                val idxIn = (y + r + 1).coerceIn(0, hm) * w + x
+                curR += rsum[idxIn] - rsum[idxOut]
+                curG += gsum[idxIn] - gsum[idxOut]
+                curB += bsum[idxIn] - bsum[idxOut]
+            }
+        }
     }
 
     private fun showHud(text: String) {

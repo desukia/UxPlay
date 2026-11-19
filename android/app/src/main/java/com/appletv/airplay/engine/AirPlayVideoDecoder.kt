@@ -163,6 +163,33 @@ class AirPlayVideoDecoder {
         }
     }
 
+    private fun extractSpsPps(data: ByteArray, length: Int): ByteArray? {
+        var spsStart = -1
+        var ppsEnd = -1
+        var i = 0
+        while (i < length - 4) {
+            if (data[i] == 0.toByte() && data[i + 1] == 0.toByte()) {
+                val startCodeLen = if (data[i + 2] == 1.toByte()) 3 else if (i + 3 < length && data[i + 2] == 0.toByte() && data[i + 3] == 1.toByte()) 4 else 0
+                if (startCodeLen > 0) {
+                    val nalStart = i + startCodeLen
+                    val nalType = data[nalStart].toInt() and 0x1F
+                    if (nalType == 7 && spsStart == -1) {
+                        spsStart = i
+                    } else if (nalType != 7 && nalType != 8 && spsStart != -1) {
+                        ppsEnd = i
+                        break
+                    }
+                    i = nalStart
+                }
+            }
+            i++
+        }
+        if (spsStart != -1 && ppsEnd > spsStart) {
+            return data.copyOfRange(spsStart, ppsEnd)
+        }
+        return null
+    }
+
     private fun containsSps(data: ByteArray, length: Int): Boolean {
         for (i in 0 until (length - 4).coerceAtLeast(0)) {
             if (data[i] == 0.toByte() && data[i + 1] == 0.toByte()) {
@@ -207,8 +234,11 @@ class AirPlayVideoDecoder {
                 SystemClock.elapsedRealtimeNanos() / 1000L
             }
 
-            val hasSpsInFrame = containsSps(data, length)
-            if (hasSpsInFrame) {
+            val extractedSps = extractSpsPps(data, length)
+            if (extractedSps != null) {
+                cachedSpsPps = extractedSps
+                hasFedSps = true
+            } else if (containsSps(data, length)) {
                 cachedSpsPps = data.copyOf(length)
                 hasFedSps = true
             } else if (!hasFedSps && cachedSpsPps != null) {
