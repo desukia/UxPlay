@@ -8,21 +8,21 @@
     android:background="@color/black_obsidian"
     android:keepScreenOn="true">
 
-    <!-- 1. Ambient / Idle Apple TV Aerial Screensaver Layer -->
+    <!-- 1. Active Mirroring Video Layer (Hardware SurfaceView kept ready at base) -->
+    <include
+        android:id="@+id/layoutMirror"
+        layout="@layout/view_apple_tv_mirror"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="visible" />
+
+    <!-- 2. Ambient / Idle Apple TV Aerial Screensaver Layer (Covers mirror when idle) -->
     <include
         android:id="@+id/layoutAmbient"
         layout="@layout/view_apple_tv_ambient"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:visibility="visible" />
-
-    <!-- 2. Active Mirroring Video Layer (Hardware SurfaceView) -->
-    <include
-        android:id="@+id/layoutMirror"
-        layout="@layout/view_apple_tv_mirror"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:visibility="gone" />
 
     <!-- 3. Music Now Playing Layer -->
     <include

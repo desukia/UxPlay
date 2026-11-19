@@ -27,6 +27,7 @@ import com.appletv.airplay.engine.NativeAirPlay
 import com.appletv.airplay.model.AirPlayState
 import com.appletv.airplay.service.AirPlayService
 import com.appletv.airplay.ui.settings.AppleTvSettingsActivity
+import com.appletv.airplay.ui.sound.AppleTvSoundManager
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -70,6 +71,8 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
 
     private val videoDecoder = AirPlayVideoDecoder()
     private val audioPlayer = AirPlayAudioPlayer()
+    private lateinit var soundManager: AppleTvSoundManager
+    private var isMirroringActive = false
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private val clockRunnable = object : Runnable {
@@ -83,6 +86,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        soundManager = AppleTvSoundManager(this)
         hideSystemUI()
         initViews()
         setupSurface()
@@ -219,8 +223,8 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     }
 
     private fun showIdleScreen() {
+        isMirroringActive = false
         layoutAmbient.visibility = View.VISIBLE
-        layoutMirror.visibility = View.GONE
         layoutNowPlaying.visibility = View.GONE
         layoutPinDialog.visibility = View.GONE
         videoDecoder.stop()
@@ -234,9 +238,11 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
 
     private fun showPinScreen() {
         layoutPinDialog.visibility = View.VISIBLE
+        soundManager.playPinDigitSound()
     }
 
     private fun showMirrorScreen() {
+        isMirroringActive = true
         layoutPinDialog.visibility = View.GONE
         layoutAmbient.visibility = View.GONE
         layoutNowPlaying.visibility = View.GONE
@@ -247,9 +253,11 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
             videoDecoder.start(surface)
         }
         audioPlayer.start()
+        soundManager.playConnectSound()
     }
 
     private fun showAudioScreen() {
+        isMirroringActive = false
         layoutPinDialog.visibility = View.GONE
         layoutAmbient.visibility = View.GONE
         layoutMirror.visibility = View.GONE
@@ -257,11 +265,13 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
 
         videoDecoder.stop()
         audioPlayer.start()
+        soundManager.playConnectSound()
     }
 
     private fun showHud(text: String) {
         txtHudText.text = text
         hudOverlay.visibility = View.VISIBLE
+        soundManager.playFocusSound()
         mainHandler.removeCallbacks(hideHudRunnable)
         mainHandler.postDelayed(hideHudRunnable, 3000)
     }
@@ -295,7 +305,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     }
 
     override fun surfaceCreated(holder: SurfaceHolder) {
-        if (NativeAirPlay.stateFlow.value == AirPlayState.MIRRORING) {
+        if (isMirroringActive || NativeAirPlay.stateFlow.value == AirPlayState.MIRRORING) {
             videoDecoder.start(holder.surface)
         }
     }
@@ -310,10 +320,12 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         if (keyCode == KeyEvent.KEYCODE_BACK) {
             if (layoutPinDialog.visibility == View.VISIBLE) {
                 layoutPinDialog.visibility = View.GONE
+                soundManager.playPinDeleteSound()
                 return true
             }
-            if (layoutMirror.visibility == View.VISIBLE || layoutNowPlaying.visibility == View.VISIBLE) {
+            if (layoutAmbient.visibility != View.VISIBLE) {
                 showIdleScreen()
+                soundManager.playFocusSound()
                 return true
             }
         }
@@ -344,5 +356,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         mainHandler.removeCallbacks(clockRunnable)
         videoDecoder.stop()
         audioPlayer.stop()
+        soundManager.release()
+    }
     }
 }

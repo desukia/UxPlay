@@ -2,15 +2,18 @@ package com.appletv.airplay.engine
 
 import android.media.AudioAttributes
 import android.media.AudioFormat
-import android.media.AudioManager
 import android.media.AudioTrack
+import android.media.MediaCodec
+import android.media.MediaFormat as AndroidMediaFormat
 import android.util.Log
+import java.nio.ByteBuffer
 import java.util.concurrent.atomic.AtomicBoolean
 
 class AirPlayAudioPlayer {
     private val TAG = "AirPlayAudioPlayer"
 
     private var audioTrack: AudioTrack? = null
+    private var aacDecoder: MediaCodec? = null
     private val isRunning = AtomicBoolean(false)
     private var volume = 1.0f
 
@@ -20,7 +23,7 @@ class AirPlayAudioPlayer {
         val channelConfig = if (channels == 1) AudioFormat.CHANNEL_OUT_MONO else AudioFormat.CHANNEL_OUT_STEREO
         val encoding = AudioFormat.ENCODING_PCM_16BIT
         val minBufferSize = AudioTrack.getMinBufferSize(sampleRate, channelConfig, encoding)
-        val bufferSize = (minBufferSize * 2).coerceAtLeast(8192)
+        val bufferSize = (minBufferSize * 4).coerceAtLeast(16384)
 
         try {
             audioTrack = AudioTrack.Builder()
@@ -62,13 +65,64 @@ class AirPlayAudioPlayer {
         if (length <= 0) return
 
         try {
-            // Format 1 = Linear PCM (S16LE)
-            // Format 2 = ALAC (Apple Lossless)
-            // Format 4 = AAC
-            // Note: UxPlay delivers uncompressed or decoded PCM chunks to audio_renderer_render_buffer
-            track.write(data, 0, length, AudioTrack.WRITE_NON_BLOCKING)
+            when (format) {
+                1 -> {
+                    // Format 1 = Linear PCM 16-bit (Native ALAC decoded or raw PCM)
+                    track.write(data, 0, length, AudioTrack.WRITE_NON_BLOCKING)
+                }
+                4, 8 -> {
+                    // AAC-LC (4) or AAC-ELD (8)
+                    decodeAndPlayAac(data, length)
+                }
+                else -> {
+                    // Fallback to direct write
+                    track.write(data, 0, length, AudioTrack.WRITE_NON_BLOCKING)
+                }
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Error writing audio to AudioTrack", e)
+        }
+    }
+
+    private fun decodeAndPlayAac(data: ByteArray, length: Int) {
+        try {
+            if (aacDecoder == null) {
+                val aacFormat = AndroidMediaFormat.createAudioFormat(AndroidMediaFormat.MIMETYPE_AUDIO_AAC, 44100, 2).apply {
+                    setInteger(AndroidMediaFormat.KEY_AAC_PROFILE, android.media.MediaCodecInfo.CodecProfileLevel.AACObjectLC)
+                    setInteger(AndroidMediaFormat.KEY_BIT_RATE, 256000)
+                }
+                aacDecoder = MediaCodec.createDecoderByType(AndroidMediaFormat.MIMETYPE_AUDIO_AAC).apply {
+                    configure(aacFormat, null, null, 0)
+                    start()
+                }
+            }
+
+            val decoder = aacDecoder ?: return
+            val inIndex = decoder.dequeueInputBuffer(5000)
+            if (inIndex >= 0) {
+                val inBuf = decoder.getInputBuffer(inIndex)
+                if (inBuf != null) {
+                    inBuf.clear()
+                    inBuf.put(data, 0, length)
+                    decoder.queueInputBuffer(inIndex, 0, length, 0, 0)
+                }
+            }
+
+            val info = MediaCodec.BufferInfo()
+            var outIndex = decoder.dequeueOutputBuffer(info, 0)
+            while (outIndex >= 0) {
+                val outBuf = decoder.getOutputBuffer(outIndex)
+                if (outBuf != null && info.size > 0) {
+                    val pcmBytes = ByteArray(info.size)
+                    outBuf.position(info.offset)
+                    outBuf.get(pcmBytes)
+                    audioTrack?.write(pcmBytes, 0, pcmBytes.size, AudioTrack.WRITE_NON_BLOCKING)
+                }
+                decoder.releaseOutputBuffer(outIndex, false)
+                outIndex = decoder.dequeueOutputBuffer(info, 0)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "AAC decode error", e)
         }
     }
 
@@ -80,6 +134,15 @@ class AirPlayAudioPlayer {
     fun stop() {
         isRunning.set(false)
         NativeAirPlay.audioFrameListener = null
+
+        try {
+            aacDecoder?.stop()
+            aacDecoder?.release()
+        } catch (e: Exception) {
+            // Ignore
+        }
+        aacDecoder = null
+
         try {
             audioTrack?.stop()
             audioTrack?.release()
@@ -87,6 +150,6 @@ class AirPlayAudioPlayer {
             Log.e(TAG, "Error stopping AudioTrack", e)
         }
         audioTrack = null
-        Log.i(TAG, "AudioTrack stopped")
+        Log.i(TAG, "AirPlayAudioPlayer stopped")
     }
 }

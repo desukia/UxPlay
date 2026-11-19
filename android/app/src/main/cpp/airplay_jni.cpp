@@ -202,7 +202,8 @@ static void cb_video_resume(void *cls) {
 static void cb_conn_init(void *cls) {
     (void)cls;
     video_renderer_start();
-    audio_renderer_start(nullptr);
+    unsigned char default_ct = 2; // Default to ALAC
+    audio_renderer_start(&default_ct);
 }
 
 static void cb_conn_destroy(void *cls) {
@@ -246,11 +247,19 @@ static void cb_audio_set_coverart(void *cls, const void *buffer, int buflen) {
 
 static void cb_audio_get_format(void *cls, unsigned char *ct, unsigned short *spf, bool *usingScreen, bool *isMedia, uint64_t *audioFormat) {
     (void)cls;
-    if (ct) *ct = 1; // PCM
-    if (spf) *spf = 352;
+    // Retain client's requested compression type (2 = ALAC, 8 = AAC-ELD, 4 = AAC-LC, 1 = PCM)
+    if (ct && *ct == 0) {
+        *ct = 2; // Default to ALAC
+    }
+    if (spf && *spf == 0) {
+        *spf = 352;
+    }
     if (usingScreen) *usingScreen = true;
     if (isMedia) *isMedia = false;
     if (audioFormat) *audioFormat = 0;
+
+    // Start audio renderer with negotiated compression type
+    audio_renderer_start(ct);
 }
 
 static void cb_display_pin(void *cls, char *pin) {

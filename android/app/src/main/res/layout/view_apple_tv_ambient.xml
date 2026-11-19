@@ -94,6 +94,7 @@
                 android:id="@+id/txtClock"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:fontFamily="@font/sf_pro_rounded"
                 android:text="12:00"
                 android:textColor="@color/text_white"
                 android:textSize="22sp"

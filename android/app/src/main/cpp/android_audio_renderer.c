@@ -1,6 +1,8 @@
 #include "android_audio_renderer.h"
+#include "alac.h"
 #include <android/log.h>
 #include <string.h>
+#include <stdlib.h>
 
 #define TAG "AndroidAudioRenderer"
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, TAG, __VA_ARGS__)
@@ -13,10 +15,39 @@ extern void jni_on_volume_changed(float volume);
 extern void jni_on_audio_state_changed(bool is_active);
 
 static bool s_is_running = false;
-static unsigned char s_current_compression_type = 1; // 1 = LPCM, 2 = ALAC, 4 = AAC
+static unsigned char s_current_compression_type = 2; // Default to ALAC for AirPlay
+static alac_file *s_alac = NULL;
+static uint8_t s_pcm_out[16384]; // 352 samples * 2ch * 2 bytes = 1408 bytes per frame
+
+// Standard 24-byte AirPlay ALAC magic cookie (44100Hz, 16bit, 2ch, 352 spf)
+static const unsigned char default_alac_magic_cookie[24] = {
+    0x00, 0x00, 0x01, 0x60, // 352 samples per frame (0x160)
+    0x00,                   // 7a
+    0x10,                   // 16 bit
+    0x28,                   // historymult (40)
+    0x0a,                   // initialhistory (10)
+    0x0e,                   // kmodifier (14)
+    0x02,                   // 2 channels
+    0x00, 0xff,             // 255
+    0x00, 0x00, 0x00, 0x00, // max sample size
+    0x00, 0x00, 0x00, 0x00, // bit rate
+    0x00, 0x00, 0xac, 0x44  // 44100 Hz (0xac44)
+};
+
+static void init_alac_decoder_if_needed() {
+    if (!s_alac) {
+        s_alac = alac_create(16, 2);
+        if (s_alac) {
+            alac_set_info(s_alac, (char*)default_alac_magic_cookie);
+            LOGI("Native ALAC decoder initialized for 44.1kHz 16-bit Stereo");
+        } else {
+            LOGE("Failed to allocate native ALAC decoder");
+        }
+    }
+}
 
 bool gstreamer_init() {
-    return true; // No GStreamer needed on Android; using Android AudioTrack
+    return true; // Android uses low-latency native ALAC decoding and AudioTrack
 }
 
 void audio_renderer_init(void *logger, const char* audiosink, const bool *audio_sync, const bool *video_sync, const char *artp_pipeline) {
@@ -25,18 +56,31 @@ void audio_renderer_init(void *logger, const char* audiosink, const bool *audio_
     (void)audio_sync;
     (void)video_sync;
     (void)artp_pipeline;
-    LOGI("Android Audio Renderer initialized for Google TV");
+    LOGI("Android Audio Renderer initialized with native ALAC decoding");
 }
 
 void audio_renderer_start(unsigned char* compression_type) {
     s_is_running = true;
-    s_current_compression_type = compression_type ? *compression_type : 1;
+    if (compression_type && *compression_type > 0) {
+        s_current_compression_type = *compression_type;
+    } else {
+        s_current_compression_type = 2; // Default ALAC
+    }
+
+    if (s_current_compression_type == 2) {
+        init_alac_decoder_if_needed();
+    }
+
     jni_on_audio_state_changed(true);
-    LOGI("Audio rendering started, compression_type: %d (1=PCM, 2=ALAC, 4=AAC)", s_current_compression_type);
+    LOGI("Audio rendering started, compression_type: %d (1=PCM, 2=ALAC, 4/8=AAC)", s_current_compression_type);
 }
 
 void audio_renderer_stop() {
     s_is_running = false;
+    if (s_alac) {
+        alac_free(s_alac);
+        s_alac = NULL;
+    }
     jni_on_audio_state_changed(false);
     LOGI("Audio rendering stopped");
 }
@@ -49,7 +93,21 @@ void audio_renderer_render_buffer(unsigned char* data, int *data_len, unsigned s
     uint64_t timestamp = ntp_time ? *ntp_time : 0;
     unsigned short seq = seqnum ? *seqnum : 0;
 
-    // Send audio buffer directly to Android AudioTrack via JNI
+    if (s_current_compression_type == 2) {
+        // ALAC compressed audio -> decode natively to 16-bit linear PCM
+        init_alac_decoder_if_needed();
+        if (s_alac) {
+            int out_bytes = 0;
+            alac_decode_frame(s_alac, data, s_pcm_out, &out_bytes);
+            if (out_bytes > 0) {
+                // Format 1 = Linear PCM (S16LE stereo 44.1kHz)
+                jni_on_audio_frame(s_pcm_out, out_bytes, 1, timestamp, seq);
+            }
+            return;
+        }
+    }
+
+    // Direct dispatch for linear PCM (1) or AAC (4 / 8)
     jni_on_audio_frame(data, *data_len, s_current_compression_type, timestamp, seq);
 }
 
@@ -64,6 +122,10 @@ void audio_renderer_flush() {
 
 void audio_renderer_destroy() {
     s_is_running = false;
+    if (s_alac) {
+        alac_free(s_alac);
+        s_alac = NULL;
+    }
     LOGI("Audio renderer destroyed");
 }
 

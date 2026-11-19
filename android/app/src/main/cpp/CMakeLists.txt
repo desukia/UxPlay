@@ -124,6 +124,7 @@ set(ANDROID_SOURCES
     airplay_jni.cpp
     android_video_renderer.c
     android_audio_renderer.c
+    alac.c
 )
 
 add_library(airplay_native SHARED
