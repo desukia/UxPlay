@@ -156,6 +156,11 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
 
     private fun setupSurface() {
         mirrorSurfaceView.holder.addCallback(this)
+        videoDecoder.onResolutionChangedListener = { width, height ->
+            runOnUiThread {
+                updateSurfaceAspectRatio(width, height)
+            }
+        }
     }
 
     private fun setupListeners() {
@@ -230,14 +235,31 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     }
 
     private fun updateSurfaceAspectRatio(videoWidth: Int, videoHeight: Int) {
+        if (videoWidth <= 0 || videoHeight <= 0) return
         mirrorSurfaceView.post {
-            // Keep SurfaceView full-screen (MATCH_PARENT) matching the native 16:9 Google TV display.
-            // AirPlay natively encodes portrait/landscape scaling and pillarboxing within the 1080p stream.
+            val container = findViewById<View>(R.id.rootContainer) ?: return@post
+            val cWidth = container.width
+            val cHeight = container.height
+            if (cWidth <= 0 || cHeight <= 0) return@post
+
+            val videoAspect = videoWidth.toFloat() / videoHeight.toFloat()
+            val screenAspect = cWidth.toFloat() / cHeight.toFloat()
+
             val lp = mirrorSurfaceView.layoutParams as? android.widget.FrameLayout.LayoutParams ?: return@post
-            lp.width = android.widget.FrameLayout.LayoutParams.MATCH_PARENT
-            lp.height = android.widget.FrameLayout.LayoutParams.MATCH_PARENT
+            if (videoAspect > screenAspect) {
+                // Video is wider than screen (e.g. landscape iPhone 19.5:9):
+                // Fit full width of screen, calculate height proportionally (letterbox top & bottom)
+                lp.width = cWidth
+                lp.height = (cWidth / videoAspect).toInt().coerceAtLeast(1)
+            } else {
+                // Video is narrower/taller than screen (e.g. portrait iPhone 9:19.5 or iPad 4:3):
+                // Fit full height of screen, calculate width proportionally (pillarbox left & right)
+                lp.height = cHeight
+                lp.width = (cHeight * videoAspect).toInt().coerceAtLeast(1)
+            }
             lp.gravity = android.view.Gravity.CENTER
             mirrorSurfaceView.layoutParams = lp
+            Log.i("MainActivity", "SurfaceView resized to ${lp.width}x${lp.height} for video ${videoWidth}x${videoHeight} (aspect: $videoAspect, screen: $screenAspect)")
         }
     }
 

@@ -367,11 +367,12 @@ static int cb_video_set_codec_and_size(void *cls, video_codec_t codec, unsigned 
     (void)codec;
     (void)x_offset;
     (void)y_offset;
-    (void)width;
-    (void)height;
-    int w = width_source > 0 ? (int)width_source : 1920;
-    int h = height_source > 0 ? (int)height_source : 1080;
-    LOGI("cb_video_set_codec_and_size: stream geometry is %dx%d (crop %dx%d)", w, h, width, height);
+    int w = width > 0 ? (int)width : (int)width_source;
+    int h = height > 0 ? (int)height : (int)height_source;
+    if (w <= 0) w = 1920;
+    if (h <= 0) h = 1080;
+    LOGI("cb_video_set_codec_and_size: active dimensions %dx%d (source %dx%d, crop %dx%d)",
+         w, h, width_source, height_source, width, height);
     g_current_width.store(w);
     g_current_height.store(h);
     jni_on_video_size_changed(w, h);
