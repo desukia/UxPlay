@@ -68,7 +68,7 @@ class AirPlayAudioPlayer {
             when (format) {
                 1 -> {
                     // Format 1 = Linear PCM 16-bit (Native ALAC decoded or raw PCM)
-                    track.write(data, 0, length, AudioTrack.WRITE_NON_BLOCKING)
+                    track.write(data, 0, length, AudioTrack.WRITE_BLOCKING)
                 }
                 4, 8 -> {
                     // AAC-LC (4) or AAC-ELD (8)
@@ -76,7 +76,7 @@ class AirPlayAudioPlayer {
                 }
                 else -> {
                     // Fallback to direct write
-                    track.write(data, 0, length, AudioTrack.WRITE_NON_BLOCKING)
+                    track.write(data, 0, length, AudioTrack.WRITE_BLOCKING)
                 }
             }
         } catch (e: Exception) {

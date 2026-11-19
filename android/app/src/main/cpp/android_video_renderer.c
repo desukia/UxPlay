@@ -16,6 +16,7 @@ extern void jni_on_video_state_changed(bool is_active);
 
 static bool s_is_running = false;
 static bool s_is_paused = false;
+static uint64_t s_video_frames_rendered = 0;
 
 void video_renderer_init(void *logger, const char *server_name, videoflip_t videoflip[2],
                          const char *parser, const char *rtp_pipeline, const char *decoder,
@@ -43,6 +44,7 @@ void video_renderer_init(void *logger, const char *server_name, videoflip_t vide
 void video_renderer_start() {
     s_is_running = true;
     s_is_paused = false;
+    s_video_frames_rendered = 0;
     jni_on_video_state_changed(true);
     LOGI("Video rendering started");
 }
@@ -50,7 +52,7 @@ void video_renderer_start() {
 void video_renderer_stop() {
     s_is_running = false;
     jni_on_video_state_changed(false);
-    LOGI("Video rendering stopped");
+    LOGI("Video rendering stopped (total frames rendered: %llu)", s_video_frames_rendered);
 }
 
 void video_renderer_set_device_model(const char *model, const char *name) {
@@ -106,6 +108,11 @@ uint64_t video_renderer_render_buffer(unsigned char* data, int *data_len, int *n
 
     uint64_t timestamp = ntp_time ? *ntp_time : 0;
     int count = nal_count ? *nal_count : 0;
+
+    s_video_frames_rendered++;
+    if (s_video_frames_rendered == 1 || s_video_frames_rendered % 120 == 0) {
+        LOGI("Video frame #%llu: %d bytes, nal_count=%d", s_video_frames_rendered, *data_len, count);
+    }
 
     // Direct hardware dispatch to Android MediaCodec via JNI
     jni_on_video_frame(data, *data_len, timestamp, count);

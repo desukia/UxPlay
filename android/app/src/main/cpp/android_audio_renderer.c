@@ -3,6 +3,7 @@
 #include <android/log.h>
 #include <string.h>
 #include <stdlib.h>
+#include <math.h>
 
 #define TAG "AndroidAudioRenderer"
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, TAG, __VA_ARGS__)
@@ -17,7 +18,8 @@ extern void jni_on_audio_state_changed(bool is_active);
 static bool s_is_running = false;
 static unsigned char s_current_compression_type = 2; // Default to ALAC for AirPlay
 static alac_file *s_alac = NULL;
-static uint8_t s_pcm_out[16384]; // 352 samples * 2ch * 2 bytes = 1408 bytes per frame
+static uint8_t s_pcm_out[65536]; // Generous 64KB PCM buffer (352 samples * 4 bytes = 1408 bytes per frame)
+static uint64_t s_audio_frames_rendered = 0;
 
 // Standard 24-byte AirPlay ALAC magic cookie (44100Hz, 16bit, 2ch, 352 spf)
 static const unsigned char default_alac_magic_cookie[24] = {
@@ -61,6 +63,7 @@ void audio_renderer_init(void *logger, const char* audiosink, const bool *audio_
 
 void audio_renderer_start(unsigned char* compression_type) {
     s_is_running = true;
+    s_audio_frames_rendered = 0;
     if (compression_type && *compression_type > 0) {
         s_current_compression_type = *compression_type;
     } else {
@@ -82,7 +85,7 @@ void audio_renderer_stop() {
         s_alac = NULL;
     }
     jni_on_audio_state_changed(false);
-    LOGI("Audio rendering stopped");
+    LOGI("Audio rendering stopped (total frames rendered: %llu)", s_audio_frames_rendered);
 }
 
 void audio_renderer_render_buffer(unsigned char* data, int *data_len, unsigned short *seqnum, uint64_t *ntp_time) {
@@ -97,9 +100,14 @@ void audio_renderer_render_buffer(unsigned char* data, int *data_len, unsigned s
         // ALAC compressed audio -> decode natively to 16-bit linear PCM
         init_alac_decoder_if_needed();
         if (s_alac) {
-            int out_bytes = 0;
+            // CRITICAL: out_bytes MUST be initialized to the capacity of the destination buffer!
+            int out_bytes = (int)sizeof(s_pcm_out);
             alac_decode_frame(s_alac, data, s_pcm_out, &out_bytes);
             if (out_bytes > 0) {
+                s_audio_frames_rendered++;
+                if (s_audio_frames_rendered == 1 || s_audio_frames_rendered % 200 == 0) {
+                    LOGD("ALAC decoded frame #%llu: %d bytes PCM", s_audio_frames_rendered, out_bytes);
+                }
                 // Format 1 = Linear PCM (S16LE stereo 44.1kHz)
                 jni_on_audio_frame(s_pcm_out, out_bytes, 1, timestamp, seq);
             }
@@ -108,12 +116,23 @@ void audio_renderer_render_buffer(unsigned char* data, int *data_len, unsigned s
     }
 
     // Direct dispatch for linear PCM (1) or AAC (4 / 8)
+    s_audio_frames_rendered++;
     jni_on_audio_frame(data, *data_len, s_current_compression_type, timestamp, seq);
 }
 
 void audio_renderer_set_volume(double volume) {
-    LOGD("AirPlay audio volume set to: %f", volume);
-    jni_on_volume_changed((float)volume);
+    // AirPlay volume arrives in decibels from -30.0 dB (min) to 0.0 dB (max), or -144.0 dB (mute)
+    float linear_vol;
+    if (volume <= -30.0) {
+        linear_vol = 0.0f;
+    } else if (volume >= 0.0) {
+        linear_vol = 1.0f;
+    } else {
+        // Linear fraction of slider: [-30 dB, 0 dB] -> [0.0, 1.0]
+        linear_vol = (float)((30.0 + volume) / 30.0);
+    }
+    LOGD("AirPlay audio volume dB: %f -> linear: %f", volume, linear_vol);
+    jni_on_volume_changed(linear_vol);
 }
 
 void audio_renderer_flush() {

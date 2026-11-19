@@ -2,6 +2,7 @@ package com.appletv.airplay.engine
 
 import android.media.MediaCodec
 import android.media.MediaFormat
+import android.os.Build
 import android.os.SystemClock
 import android.util.Log
 import android.view.Surface
@@ -20,6 +21,7 @@ class AirPlayVideoDecoder {
     private var currentWidth = 1920
     private var currentHeight = 1080
     private var frameCount = 0L
+    private var renderedFrames = 0L
 
     fun start(surface: Surface, width: Int = 1920, height: Int = 1080) {
         if (isRunning.get() && this.surface == surface && isConfigured) {
@@ -34,6 +36,7 @@ class AirPlayVideoDecoder {
         this.isRunning.set(true)
         this.isConfigured = false
         this.frameCount = 0L
+        this.renderedFrames = 0L
 
         initCodec()
         startDrainThread()
@@ -45,6 +48,19 @@ class AirPlayVideoDecoder {
         }
 
         Log.i(TAG, "AirPlayVideoDecoder started for Surface at ${currentWidth}x${currentHeight}")
+    }
+
+    fun setDimensions(width: Int, height: Int) {
+        if (width <= 0 || height <= 0) return
+        if (width != currentWidth || height != currentHeight) {
+            Log.i(TAG, "Video resolution change detected: ${currentWidth}x${currentHeight} -> ${width}x${height}")
+            currentWidth = width
+            currentHeight = height
+            val currentSurface = surface
+            if (isRunning.get() && currentSurface != null && currentSurface.isValid) {
+                initCodec()
+            }
+        }
     }
 
     private fun initCodec() {
@@ -59,8 +75,17 @@ class AirPlayVideoDecoder {
             val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, currentWidth, currentHeight).apply {
                 setInteger(MediaFormat.KEY_COLOR_FORMAT, android.media.MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
                 setInteger(MediaFormat.KEY_FRAME_RATE, 60)
-                setInteger(MediaFormat.KEY_LOW_LATENCY, 1) // Enable low-latency hardware decoding
+                // Critical: Explicitly set input buffer size to 2MB to prevent BufferOverflowException on large 1080p/4K I-frames
+                setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, 2 * 1024 * 1024)
                 setInteger(MediaFormat.KEY_PUSH_BLANK_BUFFERS_ON_STOP, 1)
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    try {
+                        setInteger(MediaFormat.KEY_LOW_LATENCY, 1)
+                    } catch (e: Exception) {
+                        // Optional hint, ignore if unsupported
+                    }
+                }
             }
 
             codec = MediaCodec.createDecoderByType(MediaFormat.MIMETYPE_VIDEO_AVC).apply {
@@ -88,8 +113,12 @@ class AirPlayVideoDecoder {
                     val outputIndex = activeCodec.dequeueOutputBuffer(info, 10000) // 10ms timeout
                     when {
                         outputIndex >= 0 -> {
-                            // Render frame directly to the hardware Surface
+                            // Render frame directly to the hardware Surface with zero display latency
                             activeCodec.releaseOutputBuffer(outputIndex, true)
+                            renderedFrames++
+                            if (renderedFrames == 1L || renderedFrames % 120L == 0L) {
+                                Log.i(TAG, "Hardware decoded & rendered frame #$renderedFrames to Surface")
+                            }
                         }
                         outputIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
                             Log.i(TAG, "MediaCodec output format changed: ${activeCodec.outputFormat}")
@@ -122,19 +151,22 @@ class AirPlayVideoDecoder {
             if (inputIndex >= 0) {
                 val inputBuffer = activeCodec.getInputBuffer(inputIndex)
                 if (inputBuffer != null) {
+                    if (length > inputBuffer.capacity()) {
+                        Log.e(TAG, "Frame size ($length bytes) exceeds input buffer capacity (${inputBuffer.capacity()})")
+                        return
+                    }
                     inputBuffer.clear()
                     inputBuffer.put(data, 0, length)
 
                     frameCount++
-                    // PTS in microseconds: use stream timestamp or monotonic time
                     val ptsUs = if (timestampNs > 0) {
                         timestampNs / 1000L
                     } else {
                         SystemClock.elapsedRealtimeNanos() / 1000L
                     }
 
-                    // CRITICAL FIX: In Annex B H.264 streams, SPS/PPS are parsed in-band.
-                    // Flags must be 0 so MediaCodec decodes the IDR slice instead of discarding it.
+                    // Annex B H.264 streams contain in-band SPS/PPS.
+                    // Flags must be 0 so MediaCodec decodes the IDR slice properly.
                     activeCodec.queueInputBuffer(
                         inputIndex,
                         0,
@@ -142,6 +174,10 @@ class AirPlayVideoDecoder {
                         ptsUs,
                         0
                     )
+
+                    if (frameCount == 1L || frameCount % 120L == 0L) {
+                        Log.d(TAG, "Fed video frame #$frameCount ($length bytes) to MediaCodec")
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -170,6 +206,6 @@ class AirPlayVideoDecoder {
         }
         codec = null
         isConfigured = false
-        Log.i(TAG, "AirPlayVideoDecoder stopped")
+        Log.i(TAG, "AirPlayVideoDecoder stopped (total fed: $frameCount, rendered: $renderedFrames)")
     }
 }

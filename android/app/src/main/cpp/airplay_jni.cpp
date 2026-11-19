@@ -33,12 +33,17 @@ static jmethodID g_mid_onPinCodeDismissed = nullptr;
 static jmethodID g_mid_onClientConnected = nullptr;
 static jmethodID g_mid_onClientDisconnected = nullptr;
 static jmethodID g_mid_onVideoFrame = nullptr;
+static jmethodID g_mid_onVideoSizeChanged = nullptr;
 static jmethodID g_mid_onAudioFrame = nullptr;
 static jmethodID g_mid_onMetadata = nullptr;
 static jmethodID g_mid_onCoverArt = nullptr;
 static jmethodID g_mid_onVolumeChanged = nullptr;
 
 static std::atomic<bool> g_is_running(false);
+static std::atomic<bool> g_video_active(false);
+static std::atomic<bool> g_audio_active(false);
+static std::atomic<int> g_current_width(1920);
+static std::atomic<int> g_current_height(1080);
 static std::thread g_server_thread;
 static raop_t *g_raop = nullptr;
 static dnssd_t *g_dnssd = nullptr;
@@ -110,15 +115,43 @@ extern "C" void jni_on_client_info(const char *model, const char *name) {
     env->DeleteLocalRef(jname);
 }
 
-extern "C" void jni_on_video_state_changed(bool is_active) {
+static void update_airplay_state() {
     std::lock_guard<std::mutex> lock(g_cb_mutex);
     if (!g_callback_obj || !g_mid_onStateChanged) return;
     JNIEnv *env = getJniEnv();
     if (!env) return;
 
     // 0 = IDLE, 1 = PIN_REQUIRED, 2 = MIRRORING, 3 = AUDIO_STREAMING
-    int state = is_active ? 2 : 0;
+    int state = 0;
+    if (g_video_active.load()) {
+        state = 2; // Screen mirroring has precedence
+    } else if (g_audio_active.load()) {
+        state = 3; // Standalone audio streaming
+    } else {
+        state = 0; // Idle
+    }
+    LOGI("AirPlay unified state: %d (video=%d, audio=%d)",
+         state, g_video_active.load() ? 1 : 0, g_audio_active.load() ? 1 : 0);
     env->CallVoidMethod(g_callback_obj, g_mid_onStateChanged, (jint)state);
+}
+
+extern "C" void jni_on_video_size_changed(int width, int height) {
+    std::lock_guard<std::mutex> lock(g_cb_mutex);
+    if (!g_callback_obj || !g_mid_onVideoSizeChanged) return;
+    JNIEnv *env = getJniEnv();
+    if (!env) return;
+
+    env->CallVoidMethod(g_callback_obj, g_mid_onVideoSizeChanged, (jint)width, (jint)height);
+}
+
+extern "C" void jni_on_video_state_changed(bool is_active) {
+    g_video_active.store(is_active);
+    update_airplay_state();
+}
+
+extern "C" void jni_on_audio_state_changed(bool is_active) {
+    g_audio_active.store(is_active);
+    update_airplay_state();
 }
 
 extern "C" void jni_on_audio_frame(const uint8_t *data, int length, int compression_type, uint64_t ntp_time, unsigned short seqnum) {
@@ -140,16 +173,6 @@ extern "C" void jni_on_volume_changed(float volume) {
     if (!env) return;
 
     env->CallVoidMethod(g_callback_obj, g_mid_onVolumeChanged, (jfloat)volume);
-}
-
-extern "C" void jni_on_audio_state_changed(bool is_active) {
-    std::lock_guard<std::mutex> lock(g_cb_mutex);
-    if (!g_callback_obj || !g_mid_onStateChanged) return;
-    JNIEnv *env = getJniEnv();
-    if (!env) return;
-
-    int state = is_active ? 3 : 0;
-    env->CallVoidMethod(g_callback_obj, g_mid_onStateChanged, (jint)state);
 }
 
 // PIN code callback from RAOP core
@@ -201,15 +224,19 @@ static void cb_video_resume(void *cls) {
 
 static void cb_conn_init(void *cls) {
     (void)cls;
+    LOGI("cb_conn_init: AirPlay client connected");
+    // Keep video renderer ready for incoming frames
     video_renderer_start();
-    unsigned char default_ct = 2; // Default to ALAC
-    audio_renderer_start(&default_ct);
 }
 
 static void cb_conn_destroy(void *cls) {
     (void)cls;
+    LOGI("cb_conn_destroy: AirPlay client disconnected");
     video_renderer_stop();
     audio_renderer_stop();
+    g_video_active.store(false);
+    g_audio_active.store(false);
+    update_airplay_state();
 }
 
 static void cb_audio_flush(void *cls) {
@@ -232,10 +259,49 @@ static void cb_audio_set_volume(void *cls, float volume) {
     audio_renderer_set_volume((double)volume);
 }
 
+// DMAP metadata parser for track title, artist, and album
+static void parse_and_dispatch_dmap(const uint8_t *data, int len) {
+    if (!data || len < 8) return;
+    char title[256] = {0};
+    char artist[256] = {0};
+    char album[256] = {0};
+
+    int pos = 0;
+    if (memcmp(data, "mlit", 4) == 0) {
+        pos += 8;
+    }
+
+    while (pos + 8 <= len) {
+        char tag[5] = {0};
+        memcpy(tag, data + pos, 4);
+        int tag_len = (data[pos+4] << 24) | (data[pos+5] << 16) | (data[pos+6] << 8) | data[pos+7];
+        pos += 8;
+        if (tag_len < 0 || pos + tag_len > len) break;
+
+        if (strcmp(tag, "minm") == 0 && tag_len < (int)sizeof(title)) {
+            memcpy(title, data + pos, tag_len);
+            title[tag_len] = '\0';
+        } else if (strcmp(tag, "asar") == 0 && tag_len < (int)sizeof(artist)) {
+            memcpy(artist, data + pos, tag_len);
+            artist[tag_len] = '\0';
+        } else if (strcmp(tag, "asal") == 0 && tag_len < (int)sizeof(album)) {
+            memcpy(album, data + pos, tag_len);
+            album[tag_len] = '\0';
+        }
+        pos += tag_len;
+    }
+
+    if (title[0] != '\0' || artist[0] != '\0') {
+        LOGI("DMAP track metadata parsed: title='%s', artist='%s', album='%s'", title, artist, album);
+        jni_on_metadata(title, artist, album);
+    }
+}
+
 static void cb_audio_set_metadata(void *cls, const void *buffer, int buflen) {
     (void)cls;
-    (void)buffer;
-    (void)buflen;
+    if (buffer && buflen > 0) {
+        parse_and_dispatch_dmap((const uint8_t*)buffer, buflen);
+    }
 }
 
 static void cb_audio_set_coverart(void *cls, const void *buffer, int buflen) {
@@ -247,6 +313,10 @@ static void cb_audio_set_coverart(void *cls, const void *buffer, int buflen) {
 
 static void cb_audio_get_format(void *cls, unsigned char *ct, unsigned short *spf, bool *usingScreen, bool *isMedia, uint64_t *audioFormat) {
     (void)cls;
+    LOGI("cb_audio_get_format: ct=%d, spf=%d, usingScreen=%d, isMedia=%d",
+         ct ? *ct : 0, spf ? *spf : 0,
+         usingScreen ? *usingScreen : 0, isMedia ? *isMedia : 0);
+
     // Retain client's requested compression type (2 = ALAC, 8 = AAC-ELD, 4 = AAC-LC, 1 = PCM)
     if (ct && *ct == 0) {
         *ct = 2; // Default to ALAC
@@ -254,12 +324,15 @@ static void cb_audio_get_format(void *cls, unsigned char *ct, unsigned short *sp
     if (spf && *spf == 0) {
         *spf = 352;
     }
-    if (usingScreen) *usingScreen = true;
-    if (isMedia) *isMedia = false;
+    if (usingScreen && *usingScreen) {
+        // Screen mirroring active - audio plays alongside video
+        g_video_active.store(true);
+    }
     if (audioFormat) *audioFormat = 0;
 
     // Start audio renderer with negotiated compression type
     audio_renderer_start(ct);
+    update_airplay_state();
 }
 
 static void cb_display_pin(void *cls, char *pin) {
@@ -279,12 +352,18 @@ static int cb_video_set_codec_and_size(void *cls, video_codec_t codec, unsigned 
                                        unsigned short y_offset, unsigned short width, unsigned short height) {
     (void)cls;
     (void)codec;
-    (void)width_source;
-    (void)height_source;
     (void)x_offset;
     (void)y_offset;
-    (void)width;
-    (void)height;
+    int w = width > 0 ? (int)width : (int)width_source;
+    int h = height > 0 ? (int)height : (int)height_source;
+    LOGI("cb_video_set_codec_and_size: %dx%d (source %dx%d)", w, h, width_source, height_source);
+    if (w > 0 && h > 0) {
+        g_current_width.store(w);
+        g_current_height.store(h);
+        jni_on_video_size_changed(w, h);
+    }
+    g_video_active.store(true);
+    update_airplay_state();
     return 0;
 }
 
@@ -333,6 +412,7 @@ Java_com_appletv_airplay_engine_NativeAirPlay_nativeInit(JNIEnv *env, jobject th
     g_mid_onClientConnected = env->GetMethodID(cbClass, "onClientConnected", "(Ljava/lang/String;Ljava/lang/String;)V");
     g_mid_onClientDisconnected = env->GetMethodID(cbClass, "onClientDisconnected", "()V");
     g_mid_onVideoFrame = env->GetMethodID(cbClass, "onVideoFrame", "([BIJI)V");
+    g_mid_onVideoSizeChanged = env->GetMethodID(cbClass, "onVideoSizeChanged", "(II)V");
     g_mid_onAudioFrame = env->GetMethodID(cbClass, "onAudioFrame", "([BIIJI)V");
     g_mid_onMetadata = env->GetMethodID(cbClass, "onMetadata", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V");
     g_mid_onCoverArt = env->GetMethodID(cbClass, "onCoverArt", "([B)V");

@@ -220,6 +220,39 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                 showHud("Volume: $pct%")
             }
         }
+
+        lifecycleScope.launch {
+            NativeAirPlay.videoSizeFlow.collectLatest { (width, height) ->
+                videoDecoder.setDimensions(width, height)
+                updateSurfaceAspectRatio(width, height)
+            }
+        }
+    }
+
+    private fun updateSurfaceAspectRatio(videoWidth: Int, videoHeight: Int) {
+        if (videoWidth <= 0 || videoHeight <= 0) return
+        mirrorSurfaceView.post {
+            val container = findViewById<View>(R.id.rootContainer) ?: return@post
+            val cWidth = container.width
+            val cHeight = container.height
+            if (cWidth <= 0 || cHeight <= 0) return@post
+
+            val videoAspect = videoWidth.toFloat() / videoHeight.toFloat()
+            val containerAspect = cWidth.toFloat() / cHeight.toFloat()
+
+            val lp = mirrorSurfaceView.layoutParams as? android.widget.FrameLayout.LayoutParams ?: return@post
+            if (videoAspect > containerAspect) {
+                // Video is wider than screen: fit width, letterbox top/bottom
+                lp.width = cWidth
+                lp.height = (cWidth / videoAspect).toInt()
+            } else {
+                // Video is narrower/taller (e.g. portrait iPhone): fit height, pillarbox left/right
+                lp.height = cHeight
+                lp.width = (cHeight * videoAspect).toInt()
+            }
+            lp.gravity = android.view.Gravity.CENTER
+            mirrorSurfaceView.layoutParams = lp
+        }
     }
 
     private fun showIdleScreen() {
@@ -249,8 +282,10 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         layoutMirror.visibility = View.VISIBLE
 
         val surface = mirrorSurfaceView.holder.surface
+        val (w, h) = NativeAirPlay.videoSizeFlow.value
         if (surface.isValid) {
-            videoDecoder.start(surface)
+            videoDecoder.start(surface, w, h)
+            updateSurfaceAspectRatio(w, h)
         }
         audioPlayer.start()
         soundManager.playConnectSound()
@@ -306,7 +341,9 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
 
     override fun surfaceCreated(holder: SurfaceHolder) {
         if (isMirroringActive || NativeAirPlay.stateFlow.value == AirPlayState.MIRRORING) {
-            videoDecoder.start(holder.surface)
+            val (w, h) = NativeAirPlay.videoSizeFlow.value
+            videoDecoder.start(holder.surface, w, h)
+            updateSurfaceAspectRatio(w, h)
         }
     }
 

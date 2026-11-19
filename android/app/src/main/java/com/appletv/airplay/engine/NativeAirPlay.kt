@@ -37,6 +37,9 @@ object NativeAirPlay {
     private val _volumeFlow = MutableStateFlow(1.0f)
     val volumeFlow = _volumeFlow.asStateFlow()
 
+    private val _videoSizeFlow = MutableStateFlow(Pair(1920, 1080))
+    val videoSizeFlow = _videoSizeFlow.asStateFlow()
+
     // Raw frame listeners for Decoders
     var videoFrameListener: ((data: ByteArray, length: Int, timestampNs: Long, nalCount: Int) -> Unit)? = null
     var audioFrameListener: ((data: ByteArray, length: Int, format: Int, timestampNs: Long, seqNum: Int) -> Unit)? = null
@@ -48,6 +51,7 @@ object NativeAirPlay {
         fun onClientConnected(clientName: String, deviceModel: String)
         fun onClientDisconnected()
         fun onVideoFrame(data: ByteArray, length: Int, timestampNs: Long, nalCount: Int)
+        fun onVideoSizeChanged(width: Int, height: Int)
         fun onAudioFrame(data: ByteArray, length: Int, format: Int, timestampNs: Long, seqNum: Int)
         fun onMetadata(title: String, artist: String, album: String)
         fun onCoverArt(jpegData: ByteArray)
@@ -93,6 +97,11 @@ object NativeAirPlay {
 
         override fun onVideoFrame(data: ByteArray, length: Int, timestampNs: Long, nalCount: Int) {
             videoFrameListener?.invoke(data, length, timestampNs, nalCount)
+        }
+
+        override fun onVideoSizeChanged(width: Int, height: Int) {
+            Log.i(TAG, "Stream resolution negotiated: ${width}x${height}")
+            _videoSizeFlow.value = Pair(width, height)
         }
 
         override fun onAudioFrame(data: ByteArray, length: Int, format: Int, timestampNs: Long, seqNum: Int) {
