@@ -21,19 +21,28 @@ static alac_file *s_alac = NULL;
 static uint8_t s_pcm_out[65536]; // Generous 64KB PCM buffer (352 samples * 4 bytes = 1408 bytes per frame)
 static uint64_t s_audio_frames_rendered = 0;
 
-// Standard 24-byte AirPlay ALAC magic cookie (44100Hz, 16bit, 2ch, 352 spf)
-static const unsigned char default_alac_magic_cookie[24] = {
+// 48-byte AirPlay ALAC magic cookie (24-byte QuickTime/MP4 atom header + 24-byte ALAC info)
+// Required by alac_set_info which skips 24 bytes of atom header: (size, frma, alac, size, alac, 0)
+static const unsigned char default_alac_magic_cookie[48] = {
+    // 24 bytes QuickTime/MP4 atom header
+    0x00, 0x00, 0x00, 0x24, // size = 36
+    'a',  'l',  'a',  'c',  // frma
+    0x00, 0x00, 0x00, 0x14, // alac
+    0x00, 0x00, 0x00, 0x00, // size
+    0x00, 0x00, 0x00, 0x00, // alac
+    0x00, 0x00, 0x00, 0x00, // 0 ?
+    // 24 bytes ALAC codec parameters (44100Hz, 16-bit, 2ch, 352 spf)
     0x00, 0x00, 0x01, 0x60, // 352 samples per frame (0x160)
-    0x00,                   // 7a
-    0x10,                   // 16 bit
+    0x00,                   // 7a (compatible version = 0)
+    0x10,                   // sample size (16 bit)
     0x28,                   // historymult (40)
     0x0a,                   // initialhistory (10)
     0x0e,                   // kmodifier (14)
-    0x02,                   // 2 channels
-    0x00, 0xff,             // 255
-    0x00, 0x00, 0x00, 0x00, // max sample size
-    0x00, 0x00, 0x00, 0x00, // bit rate
-    0x00, 0x00, 0xac, 0x44  // 44100 Hz (0xac44)
+    0x02,                   // channels (2 stereo)
+    0x00, 0xff,             // 80 (maxRun = 255)
+    0x00, 0x00, 0x00, 0x00, // 82 (max frame size)
+    0x00, 0x00, 0x00, 0x00, // 86 (bit rate)
+    0x00, 0x00, 0xac, 0x44  // 8a_rate (44100 Hz, 0xac44)
 };
 
 static void init_alac_decoder_if_needed() {

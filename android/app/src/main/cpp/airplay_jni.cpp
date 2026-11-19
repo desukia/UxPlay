@@ -225,8 +225,6 @@ static void cb_video_resume(void *cls) {
 static void cb_conn_init(void *cls) {
     (void)cls;
     LOGI("cb_conn_init: AirPlay client connected");
-    // Keep video renderer ready for incoming frames
-    video_renderer_start();
 }
 
 static void cb_conn_destroy(void *cls) {
@@ -327,6 +325,9 @@ static void cb_audio_get_format(void *cls, unsigned char *ct, unsigned short *sp
     if (usingScreen && *usingScreen) {
         // Screen mirroring active - audio plays alongside video
         g_video_active.store(true);
+    } else {
+        // Standalone audio streaming (Apple Music, Spotify, Podcasts)
+        g_video_active.store(false);
     }
     if (audioFormat) *audioFormat = 0;
 
@@ -354,14 +355,15 @@ static int cb_video_set_codec_and_size(void *cls, video_codec_t codec, unsigned 
     (void)codec;
     (void)x_offset;
     (void)y_offset;
-    int w = width > 0 ? (int)width : (int)width_source;
-    int h = height > 0 ? (int)height : (int)height_source;
-    LOGI("cb_video_set_codec_and_size: %dx%d (source %dx%d)", w, h, width_source, height_source);
-    if (w > 0 && h > 0) {
-        g_current_width.store(w);
-        g_current_height.store(h);
-        jni_on_video_size_changed(w, h);
-    }
+    (void)width;
+    (void)height;
+    int w = width_source > 0 ? (int)width_source : 1920;
+    int h = height_source > 0 ? (int)height_source : 1080;
+    LOGI("cb_video_set_codec_and_size: stream geometry is %dx%d (crop %dx%d)", w, h, width, height);
+    g_current_width.store(w);
+    g_current_height.store(h);
+    jni_on_video_size_changed(w, h);
+    video_renderer_start();
     g_video_active.store(true);
     update_airplay_state();
     return 0;

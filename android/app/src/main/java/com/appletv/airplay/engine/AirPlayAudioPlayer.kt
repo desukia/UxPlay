@@ -16,6 +16,7 @@ class AirPlayAudioPlayer {
     private var aacDecoder: MediaCodec? = null
     private val isRunning = AtomicBoolean(false)
     private var volume = 1.0f
+    private var audioFramesWritten = 0L
 
     fun start(sampleRate: Int = 44100, channels: Int = 2) {
         if (isRunning.get()) return
@@ -65,6 +66,10 @@ class AirPlayAudioPlayer {
         if (length <= 0) return
 
         try {
+            audioFramesWritten++
+            if (audioFramesWritten == 1L || audioFramesWritten % 200L == 0L) {
+                Log.d(TAG, "AudioTrack wrote frame #$audioFramesWritten ($length bytes, format=$format)")
+            }
             when (format) {
                 1 -> {
                     // Format 1 = Linear PCM 16-bit (Native ALAC decoded or raw PCM)

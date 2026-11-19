@@ -230,26 +230,12 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     }
 
     private fun updateSurfaceAspectRatio(videoWidth: Int, videoHeight: Int) {
-        if (videoWidth <= 0 || videoHeight <= 0) return
         mirrorSurfaceView.post {
-            val container = findViewById<View>(R.id.rootContainer) ?: return@post
-            val cWidth = container.width
-            val cHeight = container.height
-            if (cWidth <= 0 || cHeight <= 0) return@post
-
-            val videoAspect = videoWidth.toFloat() / videoHeight.toFloat()
-            val containerAspect = cWidth.toFloat() / cHeight.toFloat()
-
+            // Keep SurfaceView full-screen (MATCH_PARENT) matching the native 16:9 Google TV display.
+            // AirPlay natively encodes portrait/landscape scaling and pillarboxing within the 1080p stream.
             val lp = mirrorSurfaceView.layoutParams as? android.widget.FrameLayout.LayoutParams ?: return@post
-            if (videoAspect > containerAspect) {
-                // Video is wider than screen: fit width, letterbox top/bottom
-                lp.width = cWidth
-                lp.height = (cWidth / videoAspect).toInt()
-            } else {
-                // Video is narrower/taller (e.g. portrait iPhone): fit height, pillarbox left/right
-                lp.height = cHeight
-                lp.width = (cHeight * videoAspect).toInt()
-            }
+            lp.width = android.widget.FrameLayout.LayoutParams.MATCH_PARENT
+            lp.height = android.widget.FrameLayout.LayoutParams.MATCH_PARENT
             lp.gravity = android.view.Gravity.CENTER
             mirrorSurfaceView.layoutParams = lp
         }
