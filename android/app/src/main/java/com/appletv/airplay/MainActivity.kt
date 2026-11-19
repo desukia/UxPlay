@@ -358,5 +358,4 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         audioPlayer.stop()
         soundManager.release()
     }
-    }
 }
