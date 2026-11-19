@@ -281,7 +281,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         isMirroringActive = false
         layoutPinDialog.visibility = View.GONE
         layoutAmbient.visibility = View.GONE
-        layoutMirror.visibility = View.GONE
+        layoutMirror.visibility = View.VISIBLE
         layoutNowPlaying.visibility = View.VISIBLE
 
         videoDecoder.stop()

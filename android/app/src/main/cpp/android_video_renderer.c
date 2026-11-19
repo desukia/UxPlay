@@ -102,8 +102,15 @@ bool video_renderer_eos_watch() {
 }
 
 uint64_t video_renderer_render_buffer(unsigned char* data, int *data_len, int *nal_count, uint64_t *ntp_time) {
-    if (!s_is_running || !data || !data_len || *data_len <= 0) {
+    if (!data || !data_len || *data_len <= 0) {
         return 0;
+    }
+
+    if (!s_is_running) {
+        s_is_running = true;
+        s_is_paused = false;
+        jni_on_video_state_changed(true);
+        LOGI("Video rendering automatically engaged on incoming frame");
     }
 
     uint64_t timestamp = ntp_time ? *ntp_time : 0;

@@ -208,8 +208,26 @@ static void cb_video_process(void *cls, raop_ntp_t *ntp, video_decode_struct *da
     (void)cls;
     (void)ntp;
     if (data && data->data && data->data_len > 0) {
+        if (!g_video_active.load()) {
+            video_renderer_start();
+            g_video_active.store(true);
+            update_airplay_state();
+        }
         video_renderer_render_buffer(data->data, &data->data_len, &data->nal_count, &data->ntp_time_remote);
     }
+}
+
+static void cb_mirror_video_running(void *cls, bool is_running) {
+    (void)cls;
+    LOGI("cb_mirror_video_running: is_running=%d", is_running ? 1 : 0);
+    if (is_running) {
+        video_renderer_start();
+        g_video_active.store(true);
+    } else {
+        video_renderer_stop();
+        g_video_active.store(false);
+    }
+    update_airplay_state();
 }
 
 static void cb_video_pause(void *cls) {
@@ -311,9 +329,9 @@ static void cb_audio_set_coverart(void *cls, const void *buffer, int buflen) {
 
 static void cb_audio_get_format(void *cls, unsigned char *ct, unsigned short *spf, bool *usingScreen, bool *isMedia, uint64_t *audioFormat) {
     (void)cls;
-    LOGI("cb_audio_get_format: ct=%d, spf=%d, usingScreen=%d, isMedia=%d",
-         ct ? *ct : 0, spf ? *spf : 0,
-         usingScreen ? *usingScreen : 0, isMedia ? *isMedia : 0);
+    (void)usingScreen;
+    (void)isMedia;
+    LOGI("cb_audio_get_format: ct=%d, spf=%d", ct ? *ct : 0, spf ? *spf : 0);
 
     // Retain client's requested compression type (2 = ALAC, 8 = AAC-ELD, 4 = AAC-LC, 1 = PCM)
     if (ct && *ct == 0) {
@@ -322,17 +340,11 @@ static void cb_audio_get_format(void *cls, unsigned char *ct, unsigned short *sp
     if (spf && *spf == 0) {
         *spf = 352;
     }
-    if (usingScreen && *usingScreen) {
-        // Screen mirroring active - audio plays alongside video
-        g_video_active.store(true);
-    } else {
-        // Standalone audio streaming (Apple Music, Spotify, Podcasts)
-        g_video_active.store(false);
-    }
     if (audioFormat) *audioFormat = 0;
 
     // Start audio renderer with negotiated compression type
     audio_renderer_start(ct);
+    g_audio_active.store(true);
     update_airplay_state();
 }
 
@@ -470,6 +482,7 @@ Java_com_appletv_airplay_engine_NativeAirPlay_nativeStartServer(
         raop_cbs.audio_set_metadata = cb_audio_set_metadata;
         raop_cbs.audio_set_coverart = cb_audio_set_coverart;
         raop_cbs.audio_get_format = cb_audio_get_format;
+        raop_cbs.mirror_video_running = cb_mirror_video_running;
         raop_cbs.display_pin = cb_display_pin;
         raop_cbs.report_client_request = cb_report_client_request;
 
