@@ -66,8 +66,9 @@ class LyricsAdapter(
                 txtLyricLine.typeface = it
             }
             itemView.setOnClickListener {
-                val pos = bindingAdapterPosition
-                if (pos in items.indices) {
+                @Suppress("DEPRECATION")
+                val pos = adapterPosition
+                if (pos != RecyclerView.NO_POSITION && pos in items.indices) {
                     onLyricClick?.invoke(pos, items[pos])
                 }
             }
