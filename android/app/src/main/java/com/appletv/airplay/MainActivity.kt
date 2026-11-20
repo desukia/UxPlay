@@ -14,6 +14,8 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
+import android.util.DisplayMetrics
 import android.util.Log
 import android.view.KeyEvent
 import android.view.SurfaceHolder
@@ -24,9 +26,14 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.LinearSmoothScroller
+import androidx.recyclerview.widget.RecyclerView
 import com.appletv.airplay.engine.AirPlayAudioPlayer
 import com.appletv.airplay.engine.AirPlayVideoDecoder
 import com.appletv.airplay.engine.NativeAirPlay
+import com.appletv.airplay.lyrics.LyricsAdapter
+import com.appletv.airplay.lyrics.LyricsManager
 import com.appletv.airplay.model.AirPlayState
 import com.appletv.airplay.service.AirPlayService
 import com.appletv.airplay.ui.settings.AppleTvSettingsActivity
@@ -75,6 +82,16 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     private lateinit var txtAlbumName: TextView
     private lateinit var btnSettingsShortcut: View
 
+    // Apple Music Live Synced Lyrics Views & State
+    private lateinit var recyclerLyrics: RecyclerView
+    private lateinit var txtNoLyrics: TextView
+    private lateinit var lyricsAdapter: LyricsAdapter
+    private var isAudioStreamingActive = false
+    private var currentActiveIndex: Int = -1
+    private var lastReceivedPositionMs: Long = 0L
+    private var lastProgressUpdateTimestamp: Long = 0L
+    private var lastFetchedTrackKey: String = ""
+
     private val videoDecoder = NativeAirPlay.videoDecoder
     private val audioPlayer = AirPlayAudioPlayer()
     private lateinit var soundManager: AppleTvSoundManager
@@ -85,6 +102,15 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         override fun run() {
             updateClock()
             mainHandler.postDelayed(this, 1000)
+        }
+    }
+
+    private val lyricsSyncRunnable = object : Runnable {
+        override fun run() {
+            if (isAudioStreamingActive) {
+                updateActiveLyricLine()
+                mainHandler.postDelayed(this, 150)
+            }
         }
     }
 
@@ -188,6 +214,9 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         txtArtistName = findViewById(R.id.txtArtistName)
         txtAlbumName = findViewById(R.id.txtAlbumName)
         btnSettingsShortcut = findViewById(R.id.btnSettingsShortcut)
+        recyclerLyrics = findViewById(R.id.recyclerLyrics)
+        txtNoLyrics = findViewById(R.id.txtNoLyrics)
+        setupLyricsRecyclerView()
 
         // Apply Ken Burns subtle zoom effect to ambient background
         startKenBurnsEffect()
@@ -261,6 +290,12 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                     txtArtistName.text = metadata.artist.ifEmpty { "Desconhecido" }
                     txtAlbumName.text = metadata.album
 
+                    val trackKey = "${metadata.artist} - ${metadata.title}"
+                    if (trackKey != lastFetchedTrackKey) {
+                        lastFetchedTrackKey = trackKey
+                        fetchLyrics(metadata.artist, metadata.title)
+                    }
+
                     metadata.coverArtBytes?.let { bytes ->
                         if (bytes.isNotEmpty()) {
                             val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
@@ -280,6 +315,17 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                     }
                 } else {
                     resetCoverArt()
+                    resetLyrics()
+                }
+            }
+        }
+
+        lifecycleScope.launch {
+            NativeAirPlay.progressFlow.collectLatest { progress ->
+                if (progress.durationMs > 0 || progress.positionMs > 0) {
+                    lastReceivedPositionMs = progress.positionMs
+                    lastProgressUpdateTimestamp = SystemClock.elapsedRealtime()
+                    updateActiveLyricLine()
                 }
             }
         }
@@ -336,6 +382,9 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
 
     private fun showIdleScreen() {
         isMirroringActive = false
+        isAudioStreamingActive = false
+        mainHandler.removeCallbacks(lyricsSyncRunnable)
+        resetLyrics()
         layoutAmbient.visibility = View.VISIBLE
         layoutMirror.visibility = View.VISIBLE
         layoutNowPlaying.visibility = View.GONE
@@ -359,6 +408,9 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
 
     private fun showMirrorScreen() {
         isMirroringActive = true
+        isAudioStreamingActive = false
+        mainHandler.removeCallbacks(lyricsSyncRunnable)
+        resetLyrics()
         layoutPinDialog.visibility = View.GONE
         layoutAmbient.visibility = View.GONE
         layoutNowPlaying.visibility = View.GONE
@@ -377,6 +429,9 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
 
     private fun showAudioScreen() {
         isMirroringActive = false
+        isAudioStreamingActive = true
+        mainHandler.removeCallbacks(lyricsSyncRunnable)
+        mainHandler.post(lyricsSyncRunnable)
         layoutPinDialog.visibility = View.GONE
         layoutAmbient.visibility = View.GONE
         // Keep layoutMirror visible underneath so the hardware Surface is never destroyed
@@ -415,6 +470,92 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         imgAmbientGlow.animate().alpha(0f).setDuration(300).withEndAction {
             imgAmbientGlow.setImageDrawable(null)
         }.start()
+    }
+
+    private fun setupLyricsRecyclerView() {
+        lyricsAdapter = LyricsAdapter(this) { position, _ ->
+            smoothScrollLyricsTo(position)
+        }
+        val layoutManager = LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false)
+        recyclerLyrics.layoutManager = layoutManager
+        recyclerLyrics.adapter = lyricsAdapter
+    }
+
+    private fun fetchLyrics(artist: String, title: String) {
+        lifecycleScope.launch {
+            val lyrics = LyricsManager.fetchLyrics(artist, title)
+            if (!lyrics.isNullOrEmpty()) {
+                lyricsAdapter.submitList(lyrics)
+                currentActiveIndex = -1
+                recyclerLyrics.visibility = View.VISIBLE
+                txtNoLyrics.visibility = View.GONE
+                updateActiveLyricLine()
+            } else {
+                lyricsAdapter.submitList(emptyList())
+                recyclerLyrics.visibility = View.GONE
+                txtNoLyrics.visibility = View.VISIBLE
+            }
+        }
+    }
+
+    private fun updateActiveLyricLine() {
+        val items = lyricsAdapter.getItems()
+        if (items.isEmpty()) return
+
+        val elapsed = if (lastProgressUpdateTimestamp > 0) {
+            SystemClock.elapsedRealtime() - lastProgressUpdateTimestamp
+        } else 0L
+
+        val currentMs = lastReceivedPositionMs + elapsed
+
+        var targetIndex = -1
+        for (i in items.indices) {
+            if (items[i].timeMs <= currentMs) {
+                targetIndex = i
+            } else {
+                break
+            }
+        }
+
+        if (targetIndex != currentActiveIndex) {
+            currentActiveIndex = targetIndex
+            lyricsAdapter.setActivePosition(targetIndex)
+            if (targetIndex >= 0) {
+                smoothScrollLyricsTo(targetIndex)
+            }
+        }
+    }
+
+    private fun smoothScrollLyricsTo(targetPosition: Int) {
+        if (targetPosition < 0 || targetPosition >= lyricsAdapter.itemCount) return
+        val layoutManager = recyclerLyrics.layoutManager as? LinearLayoutManager ?: return
+        val smoothScroller = object : LinearSmoothScroller(this) {
+            override fun calculateDtToFit(
+                viewStart: Int,
+                viewEnd: Int,
+                boxStart: Int,
+                boxEnd: Int,
+                snapPreference: Int
+            ): Int {
+                return (boxStart + (boxEnd - boxStart) / 2) - (viewStart + (viewEnd - viewStart) / 2)
+            }
+
+            override fun calculateSpeedPerPixel(displayMetrics: DisplayMetrics): Float {
+                return 150f / displayMetrics.densityDpi
+            }
+        }
+        smoothScroller.targetPosition = targetPosition
+        layoutManager.startSmoothScroll(smoothScroller)
+    }
+
+    private fun resetLyrics() {
+        lastFetchedTrackKey = ""
+        lastReceivedPositionMs = 0L
+        lastProgressUpdateTimestamp = 0L
+        currentActiveIndex = -1
+        lyricsAdapter.submitList(emptyList())
+        recyclerLyrics.visibility = View.GONE
+        txtNoLyrics.visibility = View.GONE
     }
 
     private fun formatTime(ms: Long): String {
@@ -581,7 +722,9 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
 
     override fun onDestroy() {
         super.onDestroy()
+        isAudioStreamingActive = false
         mainHandler.removeCallbacks(clockRunnable)
+        mainHandler.removeCallbacks(lyricsSyncRunnable)
         videoDecoder.stop()
         audioPlayer.stop()
         soundManager.release()
