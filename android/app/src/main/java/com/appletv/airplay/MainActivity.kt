@@ -90,6 +90,19 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
 
         soundManager = AppleTvSoundManager(this)
         hideSystemUI()
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(true)
+            setTurnScreenOn(true)
+        } else {
+            @Suppress("DEPRECATION")
+            window.addFlags(
+                android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
+                android.view.WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
+            )
+        }
+
         initViews()
         setupSurface()
         setupListeners()
@@ -101,6 +114,18 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
 
         // Observe AirPlay engine states
         observeAirPlayEngine()
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        hideSystemUI()
+        when (NativeAirPlay.stateFlow.value) {
+            AirPlayState.MIRRORING -> showMirrorScreen()
+            AirPlayState.AUDIO_STREAMING -> showAudioScreen()
+            AirPlayState.PIN_REQUIRED -> showPinScreen()
+            AirPlayState.IDLE -> showIdleScreen()
+        }
     }
 
     override fun onResume() {
@@ -501,6 +526,10 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
             if (layoutAmbient.visibility != View.VISIBLE) {
                 showIdleScreen()
                 soundManager.playFocusSound()
+                return true
+            } else {
+                // Move task to back instead of destroying, keeping app cached in memory for instant auto-wake
+                moveTaskToBack(true)
                 return true
             }
         }
