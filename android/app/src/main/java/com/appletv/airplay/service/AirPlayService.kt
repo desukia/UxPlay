@@ -1,6 +1,5 @@
 package com.appletv.airplay.service
 
-import android.app.ActivityOptions
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -29,9 +28,7 @@ import kotlinx.coroutines.launch
 class AirPlayService : Service() {
     private val TAG = "AirPlayService"
     private val CHANNEL_ID = "airplay_service_channel"
-    private val POPUP_CHANNEL_ID = "airplay_connect_popup_channel"
     private val NOTIFICATION_ID = 1001
-    private val NOTIFICATION_ID_POPUP = 2002
 
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var wakeLock: PowerManager.WakeLock? = null
@@ -45,7 +42,7 @@ class AirPlayService : Service() {
         createNotificationChannels()
         startForeground(NOTIFICATION_ID, buildStatusNotification("AirPlay Pronto", "Aguardando conexões no Google TV..."))
 
-        // Keep CPU awake
+        // Keep CPU awake while streaming
         val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
         wakeLock = powerManager?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "AirPlayService:WakeLock")?.apply {
             setReferenceCounted(false)
@@ -68,77 +65,31 @@ class AirPlayService : Service() {
             acquireMulticastLock()
         }
 
-        // Observe AirPlay states to automatically launch/bring MainActivity to front when a connection starts
+        // Observe AirPlay states to update notification
         serviceScope.launch {
             NativeAirPlay.stateFlow.collectLatest { state ->
                 when (state) {
                     AirPlayState.MIRRORING -> {
-                        val (w, h) = NativeAirPlay.videoSizeFlow.value
-                        NativeAirPlay.videoDecoder.start(width = w, height = h)
                         updateStatusNotification("AirPlay Ativo", "Espelhando tela no Google TV")
-                        wakeAndLaunchMainActivity()
                     }
                     AirPlayState.AUDIO_STREAMING -> {
                         updateStatusNotification("AirPlay Áudio", "Reproduzindo áudio no Google TV")
-                        wakeAndLaunchMainActivity()
                     }
                     AirPlayState.PIN_REQUIRED -> {
-                        updateStatusNotification("AirPlay PIN", "Código na tela da TV")
-                        wakeAndLaunchMainActivity()
+                        updateStatusNotification("AirPlay PIN", "Código exibido na tela da TV")
                     }
                     AirPlayState.IDLE -> {
-                        NativeAirPlay.videoDecoder.stop()
                         updateStatusNotification("AirPlay Pronto", "Aguardando conexões no Google TV...")
                     }
                 }
             }
-        }
-
-        // Also trigger on incoming client negotiation
-        serviceScope.launch {
-            NativeAirPlay.clientInfoFlow.collectLatest { info ->
-                if (info.deviceName.isNotEmpty()) {
-                    wakeAndLaunchMainActivity()
-                }
-            }
-        }
-
-        // Also trigger when a PIN challenge is displayed
-        serviceScope.launch {
-            NativeAirPlay.pinCodeFlow.collectLatest { pin ->
-                if (!pin.isNullOrEmpty()) {
-                    wakeAndLaunchMainActivity()
-                }
-            }
-        }
-
-        // Also trigger on the first incoming video frame if UI is not yet open
-        NativeAirPlay.onIncomingVideoFrameListener = {
-            val (w, h) = NativeAirPlay.videoSizeFlow.value
-            NativeAirPlay.videoDecoder.start(width = w, height = h)
-            if (!MainActivity.isActivityResumed) {
-                wakeAndLaunchMainActivity()
-            }
-        }
-    }
-
-    private fun wakeScreen() {
-        try {
-            val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
-            @Suppress("DEPRECATION")
-            val screenLock = powerManager?.newWakeLock(
-                PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
-                "AirPlayService:ScreenWake"
-            )
-            screenLock?.acquire(8000)
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to wake screen: ${e.message}")
         }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val action = intent?.action
         if (action == ACTION_STOP) {
+            Log.i(TAG, "ACTION_STOP received, stopping AirPlayService and tearing down server")
             stopSelf()
             return START_NOT_STICKY
         }
@@ -165,103 +116,22 @@ class AirPlayService : Service() {
             fixedPin = fixedPin
         )
 
-        return START_STICKY
-    }
-
-    /**
-     * Wakes the Google TV screen and launches MainActivity automatically,
-     * overcoming Android background activity start restrictions via Full-Screen Intent.
-     */
-    private fun wakeAndLaunchMainActivity() {
-        Log.i(TAG, "Waking screen and launching MainActivity automatically on AirPlay connection")
-        wakeScreen()
-
-        val launchIntent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
-            addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
-        } ?: Intent(this, MainActivity::class.java).apply {
-            action = Intent.ACTION_MAIN
-            addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
-            addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
-        }
-
-        val pendingIntent = PendingIntent.getActivity(
-            this,
-            2001,
-            launchIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        // 1. Direct startActivity with Background Activity Allowed flag (Android 14+)
-        try {
-            val options = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                ActivityOptions.makeBasic().apply {
-                    setPendingIntentBackgroundActivityStartMode(ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED)
-                }.toBundle()
-            } else null
-            startActivity(launchIntent, options)
-        } catch (e: Exception) {
-            Log.w(TAG, "Direct startActivity encountered exception: ${e.message}")
-        }
-
-        // 2. Direct PendingIntent execution
-        try {
-            pendingIntent.send()
-        } catch (e: Exception) {
-            // Ignore if already launched
-        }
-
-        // 3. Full-Screen Intent Notification (Official Android TV / Android 10+ standard for waking apps)
-        try {
-            val popupNotification = NotificationCompat.Builder(this, POPUP_CHANNEL_ID)
-                .setContentTitle("AirPlay Conectado")
-                .setContentText("Iniciando transmissão na tela...")
-                .setSmallIcon(R.drawable.ic_airplay)
-                .setPriority(NotificationCompat.PRIORITY_MAX)
-                .setCategory(NotificationCompat.CATEGORY_CALL)
-                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                .setFullScreenIntent(pendingIntent, true)
-                .setAutoCancel(true)
-                .build()
-
-            val manager = getSystemService(NotificationManager::class.java)
-            manager?.notify(NOTIFICATION_ID_POPUP, popupNotification)
-        } catch (e: Exception) {
-            Log.w(TAG, "Full-screen notification error: ${e.message}")
-        }
+        return START_NOT_STICKY
     }
 
     private fun createNotificationChannels() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val manager = getSystemService(NotificationManager::class.java) ?: return
 
-            // Channel 1: Persistent Low-Importance Status Notification
             val statusChannel = NotificationChannel(
                 CHANNEL_ID,
                 "AirPlay Receptor",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Mantém o receptor AirPlay ativo em segundo plano"
+                description = "Mantém o receptor AirPlay ativo durante o uso do app"
                 setShowBadge(false)
             }
             manager.createNotificationChannel(statusChannel)
-
-            // Channel 2: High-Importance Popup Channel for Instant Full-Screen Wake-up
-            val popupChannel = NotificationChannel(
-                POPUP_CHANNEL_ID,
-                "AirPlay Conexão Automática",
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "Abre a tela do AirPlay automaticamente ao conectar dispositivo"
-                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-                setBypassDnd(true)
-                enableVibration(false)
-                setSound(null, null)
-            }
-            manager.createNotificationChannel(popupChannel)
         }
     }
 
@@ -289,12 +159,13 @@ class AirPlayService : Service() {
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         super.onTaskRemoved(rootIntent)
-        Log.i(TAG, "Task removed (app closed/swiped), maintaining AirPlayService active in foreground")
+        Log.i(TAG, "Task removed (app closed), stopping AirPlayService and shutting down server")
+        stopSelf()
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        Log.i(TAG, "AirPlayService onDestroy")
+        Log.i(TAG, "AirPlayService onDestroy: shutting down native server and releasing locks")
         serviceScope.cancel()
         NativeAirPlay.stopServer()
         nsdHelper?.releaseMulticastLock()

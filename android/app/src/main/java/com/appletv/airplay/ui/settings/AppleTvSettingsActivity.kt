@@ -134,7 +134,7 @@ class AppleTvSettingsActivity : AppCompatActivity() {
         valKenBurns.text = if (kenBurnsEnabled) "Ativado" else "Desativado"
 
         // General
-        val isBoot = prefs.getBoolean("start_on_boot", true)
+        val isBoot = prefs.getBoolean("start_on_boot", false)
         valStartBoot.text = if (isBoot) "Ativado" else "Desativado"
 
         try {
@@ -355,7 +355,7 @@ class AppleTvSettingsActivity : AppCompatActivity() {
         // --- 4. GENERAL LISTENERS ---
         findViewById<View>(R.id.itemStartBoot).setOnClickListener {
             soundManager.playFocusSound()
-            val current = prefs.getBoolean("start_on_boot", true)
+            val current = prefs.getBoolean("start_on_boot", false)
             val updated = !current
             prefs.edit().putBoolean("start_on_boot", updated).apply()
             valStartBoot.text = if (updated) "Ativado" else "Desativado"

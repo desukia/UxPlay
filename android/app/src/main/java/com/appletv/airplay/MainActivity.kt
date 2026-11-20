@@ -552,8 +552,9 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                 soundManager.playFocusSound()
                 return true
             } else {
-                // Move task to back instead of destroying, keeping app cached in memory for instant auto-wake
-                moveTaskToBack(true)
+                // Exit app cleanly, shutting down AirPlay server
+                soundManager.playFocusSound()
+                finish()
                 return true
             }
         }
@@ -585,5 +586,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         videoDecoder.stop()
         audioPlayer.stop()
         soundManager.release()
+        AirPlayService.stop(this)
+        NativeAirPlay.stopServer()
     }
 }

@@ -78,11 +78,11 @@
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
 
-        <!-- Auto-start on Boot -->
+        <!-- Auto-start on Boot disabled (AirPlay only runs while the app is open) -->
         <receiver
             android:name=".receiver.BootReceiver"
-            android:enabled="true"
-            android:exported="true">
+            android:enabled="false"
+            android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
