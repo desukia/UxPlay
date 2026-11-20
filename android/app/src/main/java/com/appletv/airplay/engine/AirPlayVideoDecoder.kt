@@ -1,6 +1,5 @@
 package com.appletv.airplay.engine
 
-import android.graphics.SurfaceTexture
 import android.media.MediaCodec
 import android.media.MediaFormat
 import android.os.Build
@@ -15,8 +14,6 @@ class AirPlayVideoDecoder {
 
     private var codec: MediaCodec? = null
     private var displaySurface: Surface? = null
-    private var dummySurfaceTexture: SurfaceTexture? = null
-    private var dummySurface: Surface? = null
 
     private val isRunning = AtomicBoolean(false)
     @Volatile private var isConfigured = false
@@ -27,33 +24,25 @@ class AirPlayVideoDecoder {
     private var frameCount = 0L
     private var renderedFrames = 0L
 
-    // Cached SPS/PPS NAL units to initialize decoder if stream started before activity
     private var cachedSpsPps: ByteArray? = null
     private var hasFedSps = false
 
     var onResolutionChangedListener: ((width: Int, height: Int) -> Unit)? = null
 
     /**
-     * Start the decoder with either a visible display Surface or a background dummy Surface.
-     * Running continuously in the background prevents dropping the initial IDR keyframes,
-     * ensuring crystal-clear quality when the user opens the app mid-stream.
+     * Start hardware video decoding directly to the provided Surface.
      */
-    fun start(surface: Surface? = null, width: Int = 1920, height: Int = 1080) {
-        if (surface != null) {
-            this.displaySurface = surface
-        }
-        this.currentWidth = if (width > 0) width else 1920
-        this.currentHeight = if (height > 0) height else 1080
-
-        if (isRunning.get() && codec != null && isConfigured) {
-            if (surface != null) {
-                attachSurface(surface)
-            }
+    fun start(surface: Surface, width: Int = 1920, height: Int = 1080) {
+        if (isRunning.get() && this.displaySurface == surface && codec != null && isConfigured) {
+            Log.d(TAG, "AirPlayVideoDecoder already initialized on this Surface")
             return
         }
 
         stop()
 
+        this.displaySurface = surface
+        this.currentWidth = if (width > 0) width else 1920
+        this.currentHeight = if (height > 0) height else 1080
         this.isRunning.set(true)
         this.isConfigured = false
         this.frameCount = 0L
@@ -81,52 +70,15 @@ class AirPlayVideoDecoder {
             }
         }
 
-        Log.i(TAG, "AirPlayVideoDecoder started for ${currentWidth}x${currentHeight} (hasSurface=${displaySurface != null})")
+        Log.i(TAG, "AirPlayVideoDecoder started for ${currentWidth}x${currentHeight} directly on Surface")
     }
 
-    /**
-     * Seamlessly transfer hardware video rendering from the background dummy surface
-     * to the user's visible SurfaceView without resetting or losing any video frames.
-     */
     fun attachSurface(surface: Surface) {
-        this.displaySurface = surface
-        val activeCodec = codec
-        if (activeCodec != null && isConfigured) {
-            try {
-                activeCodec.setOutputSurface(surface)
-                try {
-                    activeCodec.setVideoScalingMode(MediaCodec.VIDEO_SCALING_MODE_SCALE_TO_FIT)
-                } catch (e: Exception) {
-                    // Optional scaling mode
-                }
-                Log.i(TAG, "Successfully transferred hardware video rendering to display Surface via setOutputSurface")
-                return
-            } catch (e: Exception) {
-                Log.w(TAG, "setOutputSurface failed, reinitializing codec: ${e.message}")
-            }
-        }
-        initCodec()
+        start(surface, currentWidth, currentHeight)
     }
 
-    /**
-     * When MainActivity goes to the background, detach the visible Surface and fall back
-     * to decoding onto the background dummy SurfaceTexture. This keeps the H.264 reference
-     * picture buffer intact so no frames or macroblocks are ever corrupted!
-     */
     fun detachSurface() {
-        this.displaySurface = null
-        val activeCodec = codec
-        if (activeCodec != null && isConfigured) {
-            ensureDummySurface()
-            dummySurface?.let { ds ->
-                try {
-                    activeCodec.setOutputSurface(ds)
-                    Log.i(TAG, "Detached display Surface; continued background decoding on dummy Surface")
-                } catch (e: Exception) {
-                    Log.w(TAG, "Failed to revert to dummy Surface: ${e.message}")
-                }
-            }
-        }
+        stop()
     }
 
     fun setDimensions(width: Int, height: Int) {
@@ -134,18 +86,6 @@ class AirPlayVideoDecoder {
         this.currentWidth = width
         this.currentHeight = height
         onResolutionChangedListener?.invoke(width, height)
-    }
-
-    private fun ensureDummySurface() {
-        if (dummySurface == null) {
-            try {
-                val st = SurfaceTexture(0).apply { detachFromGLContext() }
-                dummySurfaceTexture = st
-                dummySurface = Surface(st)
-            } catch (e: Exception) {
-                Log.w(TAG, "Failed to create dummy SurfaceTexture: ${e.message}")
-            }
-        }
     }
 
     private fun initCodec() {
@@ -158,10 +98,9 @@ class AirPlayVideoDecoder {
         codec = null
         isConfigured = false
 
-        ensureDummySurface()
-        val targetSurface = displaySurface ?: dummySurface
-        if (targetSurface == null) {
-            Log.e(TAG, "No valid surface available for MediaCodec AVC")
+        val targetSurface = displaySurface
+        if (targetSurface == null || !targetSurface.isValid) {
+            Log.e(TAG, "No valid display surface available for MediaCodec AVC")
             return
         }
 
@@ -372,16 +311,6 @@ class AirPlayVideoDecoder {
         }
         codec = null
         isConfigured = false
-
-        try {
-            dummySurface?.release()
-            dummySurface = null
-            dummySurfaceTexture?.release()
-            dummySurfaceTexture = null
-        } catch (e: Exception) {
-            // Ignore
-        }
-
         displaySurface = null
         Log.i(TAG, "AirPlayVideoDecoder stopped (total fed: $frameCount, rendered: $renderedFrames)")
     }

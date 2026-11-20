@@ -154,7 +154,6 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     override fun onPause() {
         super.onPause()
         isActivityResumed = false
-        videoDecoder.detachSurface()
     }
 
     private fun initViews() {
@@ -342,7 +341,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         layoutNowPlaying.visibility = View.GONE
         layoutPinDialog.visibility = View.GONE
         btnSettingsShortcut.visibility = View.VISIBLE
-        videoDecoder.detachSurface()
+        videoDecoder.stop()
         audioPlayer.stop()
         resetCoverArt()
 
@@ -369,7 +368,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         val surface = mirrorSurfaceView.holder.surface
         val (w, h) = NativeAirPlay.videoSizeFlow.value
         if (surface.isValid) {
-            videoDecoder.attachSurface(surface)
+            videoDecoder.start(surface, w, h)
             updateSurfaceAspectRatio(w, h)
         }
         audioPlayer.start()
@@ -385,7 +384,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         layoutNowPlaying.visibility = View.VISIBLE
         btnSettingsShortcut.visibility = View.GONE
 
-        videoDecoder.detachSurface()
+        videoDecoder.stop()
         audioPlayer.start()
         soundManager.playConnectSound()
     }
@@ -529,7 +528,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     override fun surfaceCreated(holder: SurfaceHolder) {
         if (isMirroringActive || NativeAirPlay.stateFlow.value == AirPlayState.MIRRORING) {
             val (w, h) = NativeAirPlay.videoSizeFlow.value
-            videoDecoder.attachSurface(holder.surface)
+            videoDecoder.start(holder.surface, w, h)
             updateSurfaceAspectRatio(w, h)
         }
     }
@@ -537,7 +536,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {}
 
     override fun surfaceDestroyed(holder: SurfaceHolder) {
-        videoDecoder.detachSurface()
+        videoDecoder.stop()
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
