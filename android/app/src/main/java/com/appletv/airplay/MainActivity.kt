@@ -75,7 +75,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     private lateinit var txtAlbumName: TextView
     private lateinit var btnSettingsShortcut: View
 
-    private val videoDecoder = AirPlayVideoDecoder()
+    private val videoDecoder = NativeAirPlay.videoDecoder
     private val audioPlayer = AirPlayAudioPlayer()
     private lateinit var soundManager: AppleTvSoundManager
     private var isMirroringActive = false
@@ -154,6 +154,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     override fun onPause() {
         super.onPause()
         isActivityResumed = false
+        videoDecoder.detachSurface()
     }
 
     private fun initViews() {
@@ -325,6 +326,11 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
             }
             lp.gravity = android.view.Gravity.CENTER
             mirrorSurfaceView.layoutParams = lp
+            try {
+                mirrorSurfaceView.holder.setFixedSize(videoWidth, videoHeight)
+            } catch (e: Exception) {
+                // Ignore
+            }
             Log.i("MainActivity", "SurfaceView resized to ${lp.width}x${lp.height} for video ${videoWidth}x${videoHeight} (aspect: $videoAspect, screen: $screenAspect)")
         }
     }
@@ -336,14 +342,14 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         layoutNowPlaying.visibility = View.GONE
         layoutPinDialog.visibility = View.GONE
         btnSettingsShortcut.visibility = View.VISIBLE
-        videoDecoder.stop()
+        videoDecoder.detachSurface()
         audioPlayer.stop()
         resetCoverArt()
 
         val prefs = getSharedPreferences("apple_tv_prefs", Context.MODE_PRIVATE)
         val name = prefs.getString("device_name", "Apple TV") ?: "Apple TV"
         txtHeaderDeviceName.text = name
-        txtInstructionStep3.text = getString(R.string.instruction_step_3, name)
+        btnSettingsShortcut.requestFocus()
     }
 
     private fun showPinScreen() {
@@ -363,7 +369,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         val surface = mirrorSurfaceView.holder.surface
         val (w, h) = NativeAirPlay.videoSizeFlow.value
         if (surface.isValid) {
-            videoDecoder.start(surface, w, h)
+            videoDecoder.attachSurface(surface)
             updateSurfaceAspectRatio(w, h)
         }
         audioPlayer.start()
@@ -379,7 +385,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         layoutNowPlaying.visibility = View.VISIBLE
         btnSettingsShortcut.visibility = View.GONE
 
-        videoDecoder.stop()
+        videoDecoder.detachSurface()
         audioPlayer.start()
         soundManager.playConnectSound()
     }
@@ -523,7 +529,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     override fun surfaceCreated(holder: SurfaceHolder) {
         if (isMirroringActive || NativeAirPlay.stateFlow.value == AirPlayState.MIRRORING) {
             val (w, h) = NativeAirPlay.videoSizeFlow.value
-            videoDecoder.start(holder.surface, w, h)
+            videoDecoder.attachSurface(holder.surface)
             updateSurfaceAspectRatio(w, h)
         }
     }
@@ -531,7 +537,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {}
 
     override fun surfaceDestroyed(holder: SurfaceHolder) {
-        videoDecoder.stop()
+        videoDecoder.detachSurface()
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {

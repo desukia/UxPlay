@@ -72,11 +72,22 @@ class AirPlayService : Service() {
         serviceScope.launch {
             NativeAirPlay.stateFlow.collectLatest { state ->
                 when (state) {
-                    AirPlayState.MIRRORING, AirPlayState.AUDIO_STREAMING, AirPlayState.PIN_REQUIRED -> {
-                        updateStatusNotification("AirPlay Ativo", "Transmitindo para este dispositivo")
+                    AirPlayState.MIRRORING -> {
+                        val (w, h) = NativeAirPlay.videoSizeFlow.value
+                        NativeAirPlay.videoDecoder.start(width = w, height = h)
+                        updateStatusNotification("AirPlay Ativo", "Espelhando tela no Google TV")
+                        wakeAndLaunchMainActivity()
+                    }
+                    AirPlayState.AUDIO_STREAMING -> {
+                        updateStatusNotification("AirPlay Áudio", "Reproduzindo áudio no Google TV")
+                        wakeAndLaunchMainActivity()
+                    }
+                    AirPlayState.PIN_REQUIRED -> {
+                        updateStatusNotification("AirPlay PIN", "Código na tela da TV")
                         wakeAndLaunchMainActivity()
                     }
                     AirPlayState.IDLE -> {
+                        NativeAirPlay.videoDecoder.stop()
                         updateStatusNotification("AirPlay Pronto", "Aguardando conexões no Google TV...")
                     }
                 }
@@ -103,6 +114,8 @@ class AirPlayService : Service() {
 
         // Also trigger on the first incoming video frame if UI is not yet open
         NativeAirPlay.onIncomingVideoFrameListener = {
+            val (w, h) = NativeAirPlay.videoSizeFlow.value
+            NativeAirPlay.videoDecoder.start(width = w, height = h)
             if (!MainActivity.isActivityResumed) {
                 wakeAndLaunchMainActivity()
             }

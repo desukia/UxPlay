@@ -52,6 +52,9 @@ object NativeAirPlay {
     var videoFrameListener: ((data: ByteArray, length: Int, timestampNs: Long, nalCount: Int) -> Unit)? = null
     var audioFrameListener: ((data: ByteArray, length: Int, format: Int, timestampNs: Long, seqNum: Int) -> Unit)? = null
 
+    // Shared hardware video decoder instance
+    val videoDecoder = AirPlayVideoDecoder()
+
     // Persistent video configuration cache (persists even if Activity is recreated or closed)
     @Volatile var cachedSpsPps: ByteArray? = null
     @Volatile var cachedKeyFrame: ByteArray? = null
@@ -149,6 +152,7 @@ object NativeAirPlay {
 
         override fun onClientDisconnected() {
             Log.i(TAG, "Client disconnected")
+            videoDecoder.stop()
             cachedSpsPps = null
             cachedKeyFrame = null
             _clientInfoFlow.value = AirPlayClientInfo()
@@ -173,6 +177,7 @@ object NativeAirPlay {
         override fun onVideoSizeChanged(width: Int, height: Int) {
             Log.i(TAG, "Stream resolution negotiated: ${width}x${height}")
             _videoSizeFlow.value = Pair(width, height)
+            videoDecoder.setDimensions(width, height)
         }
 
         override fun onAudioFrame(data: ByteArray, length: Int, format: Int, timestampNs: Long, seqNum: Int) {

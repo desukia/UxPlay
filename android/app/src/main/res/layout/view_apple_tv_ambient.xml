@@ -2,191 +2,113 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="@color/black_obsidian">
 
-    <!-- Aerial Screensaver Backdrop Image / Video -->
+    <!-- Subtle aerial backdrop screensaver -->
     <ImageView
         android:id="@+id/imgAerialBackdrop"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:scaleType="centerCrop"
-        android:src="@drawable/tv_banner" />
+        android:src="@drawable/tv_banner"
+        android:alpha="0.22" />
 
-    <!-- Dark subtle vignette gradient overlay -->
+    <!-- Dark vignette overlay for deep Apple TV contrast -->
     <View
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#66000000" />
+        android:background="#D0000000" />
 
-    <!-- Top Status Bar (tvOS style) -->
-    <RelativeLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:paddingStart="48dp"
-        android:paddingTop="36dp"
-        android:paddingEnd="48dp">
-
-        <!-- Apple TV Logo Badge -->
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_alignParentStart="true"
-            android:layout_centerVertical="true"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
-
-            <ImageView
-                android:layout_width="28dp"
-                android:layout_height="28dp"
-                android:layout_marginEnd="10dp"
-                android:src="@drawable/ic_appletv_icon" />
-
-            <TextView
-                android:id="@+id/txtHeaderDeviceName"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Apple TV"
-                android:textColor="@color/text_white"
-                android:textSize="18sp"
-                android:textStyle="bold" />
-        </LinearLayout>
-
-        <!-- Right: Wi-Fi Pill and Live Clock -->
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_alignParentEnd="true"
-            android:layout_centerVertical="true"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
-
-            <!-- Wi-Fi Pill -->
-            <LinearLayout
-                android:id="@+id/pillWifi"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="20dp"
-                android:background="@drawable/bg_glass_pill"
-                android:gravity="center_vertical"
-                android:paddingStart="14dp"
-                android:paddingTop="6dp"
-                android:paddingEnd="16dp"
-                android:paddingBottom="6dp">
-
-                <ImageView
-                    android:layout_width="16dp"
-                    android:layout_height="16dp"
-                    android:layout_marginEnd="8dp"
-                    android:src="@drawable/ic_wifi"
-                    app:tint="@color/text_white" />
-
-                <TextView
-                    android:id="@+id/txtWifiSsid"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Wi-Fi Conectado"
-                    android:textColor="@color/text_white"
-                    android:textSize="13sp" />
-            </LinearLayout>
-
-            <!-- Live Clock -->
-            <TextView
-                android:id="@+id/txtClock"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:fontFamily="@font/sf_pro_rounded"
-                android:text="12:00"
-                android:textColor="@color/text_white"
-                android:textSize="22sp"
-                android:textStyle="bold" />
-        </LinearLayout>
-    </RelativeLayout>
-
-    <!-- Center-Left Card: Apple TV AirPlay Guidance -->
+    <!-- Minimalist Apple TV Idle Centerpiece -->
     <LinearLayout
-        android:layout_width="480dp"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="center_vertical"
-        android:layout_marginStart="64dp"
-        android:background="@drawable/bg_frosted_card"
-        android:elevation="12dp"
-        android:orientation="vertical"
-        android:padding="36dp">
+        android:layout_gravity="center"
+        android:gravity="center"
+        android:orientation="vertical">
 
-        <!-- Card Header -->
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
+        <!-- AirPlay Icon -->
+        <ImageView
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:layout_marginBottom="18dp"
+            android:src="@drawable/ic_airplay"
+            app:tint="@color/text_white" />
 
-            <ImageView
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:layout_marginEnd="16dp"
-                android:src="@drawable/ic_airplay" />
-
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="vertical">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/airplay_title"
-                    android:textColor="@color/text_white"
-                    android:textSize="26sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/txtStatusSubtitle"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:text="@string/ready_to_connect"
-                    android:textColor="@color/apple_green"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
-            </LinearLayout>
-        </LinearLayout>
-
-        <!-- Divider -->
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:layout_marginTop="20dp"
-            android:layout_marginBottom="20dp"
-            android:background="#26FFFFFF" />
-
-        <!-- Instructions -->
+        <!-- "AirPlay" Title with Apple SF Pro Display Font -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/instruction_step_1"
-            android:textColor="@color/text_secondary"
-            android:textSize="15sp"
-            android:lineSpacingExtra="4dp" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="@string/instruction_step_2"
-            android:textColor="@color/text_secondary"
-            android:textSize="15sp"
-            android:lineSpacingExtra="4dp" />
-
-        <TextView
-            android:id="@+id/txtInstructionStep3"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="Selecione &quot;Apple TV&quot;"
+            android:fontFamily="@font/sf_pro_display"
+            android:letterSpacing="0.03"
+            android:text="@string/airplay_title"
             android:textColor="@color/text_white"
-            android:textSize="16sp"
+            android:textSize="50sp"
             android:textStyle="bold" />
 
+        <!-- Discreet Device Name Subtitle -->
+        <TextView
+            android:id="@+id/txtHeaderDeviceName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:fontFamily="@font/sf_pro_display"
+            android:text="Apple TV"
+            android:textColor="#80FFFFFF"
+            android:textSize="17sp" />
+
+        <!-- Apple TV Settings Button with Apple SF Pro Font -->
+        <LinearLayout
+            android:id="@+id/btnSettingsShortcut"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="36dp"
+            android:background="@drawable/bg_tvos_button_selector"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="24dp"
+            android:paddingTop="12dp"
+            android:paddingEnd="28dp"
+            android:paddingBottom="12dp">
+
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_marginEnd="10dp"
+                android:src="@drawable/ic_settings"
+                app:tint="@color/color_tvos_button_text" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/sf_pro_display"
+                android:text="Ajustes"
+                android:textColor="@color/color_tvos_button_text"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+        </LinearLayout>
     </LinearLayout>
+
+    <!-- Hidden legacy compatibility stubs (preventing null pointer exceptions) -->
+    <TextView
+        android:id="@+id/txtClock"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/txtWifiSsid"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/txtInstructionStep3"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
 
 </FrameLayout>
