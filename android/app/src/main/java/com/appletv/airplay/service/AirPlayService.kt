@@ -100,6 +100,27 @@ class AirPlayService : Service() {
                 }
             }
         }
+
+        // Also trigger on the first incoming video frame if UI is not yet open
+        NativeAirPlay.onIncomingVideoFrameListener = {
+            if (!MainActivity.isActivityResumed) {
+                wakeAndLaunchMainActivity()
+            }
+        }
+    }
+
+    private fun wakeScreen() {
+        try {
+            val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
+            @Suppress("DEPRECATION")
+            val screenLock = powerManager?.newWakeLock(
+                PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
+                "AirPlayService:ScreenWake"
+            )
+            screenLock?.acquire(8000)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to wake screen: ${e.message}")
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -140,14 +161,18 @@ class AirPlayService : Service() {
      */
     private fun wakeAndLaunchMainActivity() {
         Log.i(TAG, "Waking screen and launching MainActivity automatically on AirPlay connection")
+        wakeScreen()
 
-        val launchIntent = Intent(this, MainActivity::class.java).apply {
+        val launchIntent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+            addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        } ?: Intent(this, MainActivity::class.java).apply {
             action = Intent.ACTION_MAIN
-            addCategory(Intent.CATEGORY_LAUNCHER)
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or
-                    Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or
-                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                    Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
+            addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+            addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
         }
 
         val pendingIntent = PendingIntent.getActivity(

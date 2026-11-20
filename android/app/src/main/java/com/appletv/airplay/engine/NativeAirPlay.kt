@@ -52,6 +52,57 @@ object NativeAirPlay {
     var videoFrameListener: ((data: ByteArray, length: Int, timestampNs: Long, nalCount: Int) -> Unit)? = null
     var audioFrameListener: ((data: ByteArray, length: Int, format: Int, timestampNs: Long, seqNum: Int) -> Unit)? = null
 
+    // Persistent video configuration cache (persists even if Activity is recreated or closed)
+    @Volatile var cachedSpsPps: ByteArray? = null
+    @Volatile var cachedKeyFrame: ByteArray? = null
+
+    // Callback invoked when incoming video frame arrives (used by AirPlayService to detect live streaming)
+    var onIncomingVideoFrameListener: (() -> Unit)? = null
+
+    fun extractSpsPpsFromData(data: ByteArray, length: Int): ByteArray? {
+        var spsStart = -1
+        var ppsEnd = -1
+        var i = 0
+        while (i < length - 4) {
+            if (data[i] == 0.toByte() && data[i + 1] == 0.toByte()) {
+                val startCodeLen = if (data[i + 2] == 1.toByte()) 3 else if (i + 3 < length && data[i + 2] == 0.toByte() && data[i + 3] == 1.toByte()) 4 else 0
+                if (startCodeLen > 0) {
+                    val nalStart = i + startCodeLen
+                    val nalType = data[nalStart].toInt() and 0x1F
+                    if (nalType == 7 && spsStart == -1) {
+                        spsStart = i
+                    } else if (nalType != 7 && nalType != 8 && spsStart != -1) {
+                        ppsEnd = i
+                        break
+                    }
+                    i = nalStart
+                }
+            }
+            i++
+        }
+        if (spsStart != -1 && ppsEnd > spsStart) {
+            return data.copyOfRange(spsStart, ppsEnd)
+        }
+        return null
+    }
+
+    fun isIdrFrame(data: ByteArray, length: Int): Boolean {
+        for (i in 0 until (length - 4).coerceAtLeast(0)) {
+            if (data[i] == 0.toByte() && data[i + 1] == 0.toByte()) {
+                val nalStart = when {
+                    data[i + 2] == 1.toByte() -> i + 3
+                    i + 3 < length && data[i + 2] == 0.toByte() && data[i + 3] == 1.toByte() -> i + 4
+                    else -> -1
+                }
+                if (nalStart != -1 && nalStart < length) {
+                    val nalType = data[nalStart].toInt() and 0x1F
+                    if (nalType == 5) return true
+                }
+            }
+        }
+        return false
+    }
+
     interface NativeCallbacks {
         fun onStateChanged(stateCode: Int)
         fun onPinCodeRequired(pin: String)
@@ -98,6 +149,8 @@ object NativeAirPlay {
 
         override fun onClientDisconnected() {
             Log.i(TAG, "Client disconnected")
+            cachedSpsPps = null
+            cachedKeyFrame = null
             _clientInfoFlow.value = AirPlayClientInfo()
             _metadataFlow.value = TrackMetadata()
             _progressFlow.value = AudioProgress()
@@ -106,6 +159,14 @@ object NativeAirPlay {
         }
 
         override fun onVideoFrame(data: ByteArray, length: Int, timestampNs: Long, nalCount: Int) {
+            val sps = extractSpsPpsFromData(data, length)
+            if (sps != null) {
+                cachedSpsPps = sps
+            }
+            if (isIdrFrame(data, length)) {
+                cachedKeyFrame = data.copyOf(length)
+            }
+            onIncomingVideoFrameListener?.invoke()
             videoFrameListener?.invoke(data, length, timestampNs, nalCount)
         }
 

@@ -39,6 +39,10 @@ import java.util.Locale
 
 class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
 
+    companion object {
+        @Volatile var isActivityResumed = false
+    }
+
     private lateinit var layoutAmbient: View
     private lateinit var layoutMirror: View
     private lateinit var layoutNowPlaying: View
@@ -130,12 +134,26 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
 
     override fun onResume() {
         super.onResume()
+        isActivityResumed = true
         hideSystemUI()
         val prefs = getSharedPreferences("apple_tv_prefs", Context.MODE_PRIVATE)
         val name = prefs.getString("device_name", "Apple TV") ?: "Apple TV"
         txtHeaderDeviceName.text = name
         txtInstructionStep3.text = getString(R.string.instruction_step_3, name)
         updateNetworkInfo()
+
+        // If mirroring is active when resuming/opening, ensure decoder is running!
+        when (NativeAirPlay.stateFlow.value) {
+            AirPlayState.MIRRORING -> showMirrorScreen()
+            AirPlayState.AUDIO_STREAMING -> showAudioScreen()
+            AirPlayState.PIN_REQUIRED -> showPinScreen()
+            AirPlayState.IDLE -> {}
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        isActivityResumed = false
     }
 
     private fun initViews() {

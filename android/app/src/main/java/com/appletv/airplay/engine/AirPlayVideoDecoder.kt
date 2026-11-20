@@ -50,6 +50,28 @@ class AirPlayVideoDecoder {
         initCodec()
         startDrainThread()
 
+        // If the stream was already running while the app was closed/minimized,
+        // pre-feed the cached SPS/PPS and IDR Keyframe directly into MediaCodec so
+        // it can immediately decode incoming P-frames with ZERO black screen delay!
+        val ptsUs = SystemClock.elapsedRealtimeNanos() / 1000L
+        val cachedSps = NativeAirPlay.cachedSpsPps ?: cachedSpsPps
+        if (cachedSps != null) {
+            codec?.let { activeCodec ->
+                if (enqueueBuffer(activeCodec, cachedSps, cachedSps.size, ptsUs)) {
+                    hasFedSps = true
+                    Log.i(TAG, "Pre-fed cached SPS/PPS (${cachedSps.size} bytes) on decoder start")
+                }
+            }
+        }
+
+        val cachedKey = NativeAirPlay.cachedKeyFrame
+        if (cachedKey != null) {
+            codec?.let { activeCodec ->
+                enqueueBuffer(activeCodec, cachedKey, cachedKey.size, ptsUs)
+                Log.i(TAG, "Pre-fed cached IDR Keyframe (${cachedKey.size} bytes) on decoder start")
+            }
+        }
+
         NativeAirPlay.videoFrameListener = { data, length, timestampNs, _ ->
             if (isRunning.get()) {
                 feedFrame(data, length, timestampNs)
@@ -237,14 +259,16 @@ class AirPlayVideoDecoder {
             val extractedSps = extractSpsPps(data, length)
             if (extractedSps != null) {
                 cachedSpsPps = extractedSps
+                NativeAirPlay.cachedSpsPps = extractedSps
                 hasFedSps = true
             } else if (containsSps(data, length)) {
                 cachedSpsPps = data.copyOf(length)
+                NativeAirPlay.cachedSpsPps = cachedSpsPps
                 hasFedSps = true
-            } else if (!hasFedSps && cachedSpsPps != null) {
+            } else if (!hasFedSps) {
                 // If this is a P-frame and we haven't fed an SPS yet, feed the cached SPS/PPS first!
-                val spsData = cachedSpsPps!!
-                if (enqueueBuffer(activeCodec, spsData, spsData.size, ptsUs)) {
+                val spsData = NativeAirPlay.cachedSpsPps ?: cachedSpsPps
+                if (spsData != null && enqueueBuffer(activeCodec, spsData, spsData.size, ptsUs)) {
                     hasFedSps = true
                     Log.i(TAG, "Pre-fed cached SPS/PPS (${spsData.size} bytes) to ensure decoder synchronization")
                 }
