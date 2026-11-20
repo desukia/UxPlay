@@ -5,219 +5,628 @@
     android:layout_height="match_parent"
     android:background="@color/black_obsidian"
     android:orientation="horizontal"
-    android:padding="48dp">
+    android:paddingStart="64dp"
+    android:paddingTop="48dp"
+    android:paddingEnd="64dp"
+    android:paddingBottom="48dp">
 
-    <!-- Left Column: Category Navigation -->
+    <!-- Left Column: Category Navigation Tabs -->
     <LinearLayout
+        android:id="@+id/categoryColumn"
         android:layout_width="320dp"
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-        <!-- Header -->
+        <!-- tvOS Settings Header -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="32dp"
+            android:layout_marginBottom="36dp"
             android:text="@string/settings_title"
             android:textColor="@color/text_white"
-            android:textSize="32sp"
+            android:textSize="36sp"
             android:textStyle="bold" />
 
-        <!-- Categories -->
+        <!-- 1. AirPlay & HomeKit -->
         <TextView
             android:id="@+id/catAirPlay"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:background="@drawable/bg_glass_pill"
+            android:clickable="true"
             android:focusable="true"
-            android:paddingStart="20dp"
-            android:paddingTop="14dp"
-            android:paddingEnd="20dp"
-            android:paddingBottom="14dp"
+            android:focusableInTouchMode="true"
+            android:nextFocusDown="@+id/catVideoAudio"
+            android:nextFocusRight="@+id/itemDeviceName"
+            android:paddingStart="24dp"
+            android:paddingTop="16dp"
+            android:paddingEnd="24dp"
+            android:paddingBottom="16dp"
             android:text="@string/category_airplay"
             android:textColor="@color/text_white"
-            android:textSize="18sp"
+            android:textSize="20sp"
             android:textStyle="bold" />
 
+        <!-- 2. Video & Audio -->
         <TextView
             android:id="@+id/catVideoAudio"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
+            android:layout_marginTop="14dp"
+            android:background="@drawable/bg_settings_tab_selector"
+            android:clickable="true"
             android:focusable="true"
-            android:paddingStart="20dp"
-            android:paddingTop="14dp"
-            android:paddingEnd="20dp"
-            android:paddingBottom="14dp"
+            android:focusableInTouchMode="true"
+            android:nextFocusUp="@+id/catAirPlay"
+            android:nextFocusDown="@+id/catScreensaver"
+            android:nextFocusRight="@+id/itemVideoFormat"
+            android:paddingStart="24dp"
+            android:paddingTop="16dp"
+            android:paddingEnd="24dp"
+            android:paddingBottom="16dp"
             android:text="@string/category_video_audio"
             android:textColor="@color/text_secondary"
-            android:textSize="18sp" />
+            android:textSize="20sp" />
 
+        <!-- 3. Screensaver -->
         <TextView
             android:id="@+id/catScreensaver"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
+            android:layout_marginTop="14dp"
+            android:background="@drawable/bg_settings_tab_selector"
+            android:clickable="true"
             android:focusable="true"
-            android:paddingStart="20dp"
-            android:paddingTop="14dp"
-            android:paddingEnd="20dp"
-            android:paddingBottom="14dp"
+            android:focusableInTouchMode="true"
+            android:nextFocusUp="@+id/catVideoAudio"
+            android:nextFocusDown="@+id/catGeneral"
+            android:nextFocusRight="@+id/itemScreensaverType"
+            android:paddingStart="24dp"
+            android:paddingTop="16dp"
+            android:paddingEnd="24dp"
+            android:paddingBottom="16dp"
             android:text="@string/category_screensaver"
             android:textColor="@color/text_secondary"
-            android:textSize="18sp" />
+            android:textSize="20sp" />
 
+        <!-- 4. General -->
         <TextView
             android:id="@+id/catGeneral"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
+            android:layout_marginTop="14dp"
+            android:background="@drawable/bg_settings_tab_selector"
+            android:clickable="true"
             android:focusable="true"
-            android:paddingStart="20dp"
-            android:paddingTop="14dp"
-            android:paddingEnd="20dp"
-            android:paddingBottom="14dp"
+            android:focusableInTouchMode="true"
+            android:nextFocusUp="@+id/catScreensaver"
+            android:nextFocusRight="@+id/itemStartBoot"
+            android:paddingStart="24dp"
+            android:paddingTop="16dp"
+            android:paddingEnd="24dp"
+            android:paddingBottom="16dp"
             android:text="@string/category_general"
             android:textColor="@color/text_secondary"
-            android:textSize="18sp" />
+            android:textSize="20sp" />
     </LinearLayout>
 
-    <!-- Vertical Divider -->
+    <!-- Vertical Separator Divider -->
     <View
         android:layout_width="1dp"
         android:layout_height="match_parent"
-        android:layout_marginStart="36dp"
-        android:layout_marginEnd="48dp"
+        android:layout_marginStart="44dp"
+        android:layout_marginEnd="56dp"
         android:background="#1AFFFFFF" />
 
-    <!-- Right Column: Settings Item List -->
+    <!-- Right Column: Settings Content Panels -->
     <ScrollView
+        android:id="@+id/panelScrollView"
         android:layout_width="0dp"
         android:layout_height="match_parent"
-        android:layout_weight="1">
+        android:layout_weight="1"
+        android:fadeScrollbars="true">
 
-        <LinearLayout
-            android:id="@+id/settingsPanel"
+        <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:layout_height="wrap_content">
 
-            <!-- Device Name Setting Item -->
+            <!-- Panel 1: AirPlay & HomeKit -->
             <LinearLayout
-                android:id="@+id/itemDeviceName"
+                android:id="@+id/panelAirPlay"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:background="@drawable/bg_frosted_card"
-                android:clickable="true"
-                android:focusable="true"
-                android:orientation="horizontal"
-                android:padding="24dp">
+                android:orientation="vertical"
+                android:visibility="visible">
 
-                <TextView
-                    android:layout_width="0dp"
+                <!-- Device Name -->
+                <LinearLayout
+                    android:id="@+id/itemDeviceName"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="@string/setting_device_name"
-                    android:textColor="@color/text_white"
-                    android:textSize="18sp" />
+                    android:background="@drawable/bg_settings_card_selector"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
+                    android:nextFocusLeft="@+id/catAirPlay"
+                    android:orientation="horizontal"
+                    android:padding="22dp">
 
-                <TextView
-                    android:id="@+id/valDeviceName"
-                    android:layout_width="wrap_content"
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/setting_device_name"
+                        android:textColor="@color/text_white"
+                        android:textSize="18sp" />
+
+                    <TextView
+                        android:id="@+id/valDeviceName"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Apple TV"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="17sp" />
+                </LinearLayout>
+
+                <!-- PIN Requirement -->
+                <LinearLayout
+                    android:id="@+id/itemRequirePin"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Apple TV (Sala)"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="16sp" />
+                    android:layout_marginTop="16dp"
+                    android:background="@drawable/bg_settings_card_selector"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
+                    android:nextFocusLeft="@+id/catAirPlay"
+                    android:orientation="horizontal"
+                    android:padding="22dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/setting_require_pin"
+                        android:textColor="@color/text_white"
+                        android:textSize="18sp" />
+
+                    <TextView
+                        android:id="@+id/valRequirePin"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/pin_first_time"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="17sp" />
+                </LinearLayout>
+
+                <!-- AirPlay Access Mode -->
+                <LinearLayout
+                    android:id="@+id/itemAirPlayAccess"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:background="@drawable/bg_settings_card_selector"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
+                    android:nextFocusLeft="@+id/catAirPlay"
+                    android:orientation="horizontal"
+                    android:padding="22dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/setting_airplay_access"
+                        android:textColor="@color/text_white"
+                        android:textSize="18sp" />
+
+                    <TextView
+                        android:id="@+id/valAirPlayAccess"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Mesma Rede (Padrão)"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="17sp" />
+                </LinearLayout>
+
+                <!-- Resolution -->
+                <LinearLayout
+                    android:id="@+id/itemResolution"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:background="@drawable/bg_settings_card_selector"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
+                    android:nextFocusLeft="@+id/catAirPlay"
+                    android:orientation="horizontal"
+                    android:padding="22dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/setting_resolution"
+                        android:textColor="@color/text_white"
+                        android:textSize="18sp" />
+
+                    <TextView
+                        android:id="@+id/valResolution"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="1080p 60Hz (Padrão)"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="17sp" />
+                </LinearLayout>
             </LinearLayout>
 
-            <!-- PIN Requirement Setting Item -->
+            <!-- Panel 2: Video & Audio -->
             <LinearLayout
-                android:id="@+id/itemRequirePin"
+                android:id="@+id/panelVideoAudio"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:background="@drawable/bg_frosted_card"
-                android:clickable="true"
-                android:focusable="true"
-                android:orientation="horizontal"
-                android:padding="24dp">
+                android:orientation="vertical"
+                android:visibility="gone">
 
-                <TextView
-                    android:layout_width="0dp"
+                <!-- Video Format -->
+                <LinearLayout
+                    android:id="@+id/itemVideoFormat"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="@string/setting_require_pin"
-                    android:textColor="@color/text_white"
-                    android:textSize="18sp" />
+                    android:background="@drawable/bg_settings_card_selector"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
+                    android:nextFocusLeft="@+id/catVideoAudio"
+                    android:orientation="horizontal"
+                    android:padding="22dp">
 
-                <TextView
-                    android:id="@+id/valRequirePin"
-                    android:layout_width="wrap_content"
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/setting_video_format"
+                        android:textColor="@color/text_white"
+                        android:textSize="18sp" />
+
+                    <TextView
+                        android:id="@+id/valVideoFormat"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="1080p SDR 60Hz"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="17sp" />
+                </LinearLayout>
+
+                <!-- Aspect Ratio Mode -->
+                <LinearLayout
+                    android:id="@+id/itemAspectRatio"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="@string/pin_first_time"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="16sp" />
+                    android:layout_marginTop="16dp"
+                    android:background="@drawable/bg_settings_card_selector"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
+                    android:nextFocusLeft="@+id/catVideoAudio"
+                    android:orientation="horizontal"
+                    android:padding="22dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/setting_aspect_ratio"
+                        android:textColor="@color/text_white"
+                        android:textSize="18sp" />
+
+                    <TextView
+                        android:id="@+id/valAspectRatio"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Manter Original (Letterbox)"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="17sp" />
+                </LinearLayout>
+
+                <!-- Audio Output Format -->
+                <LinearLayout
+                    android:id="@+id/itemAudioFormat"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:background="@drawable/bg_settings_card_selector"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
+                    android:nextFocusLeft="@+id/catVideoAudio"
+                    android:orientation="horizontal"
+                    android:padding="22dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/setting_audio_format"
+                        android:textColor="@color/text_white"
+                        android:textSize="18sp" />
+
+                    <TextView
+                        android:id="@+id/valAudioFormat"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Lossless 44.1kHz Estéreo"
+                        android:textColor="@color/apple_green"
+                        android:textSize="17sp" />
+                </LinearLayout>
+
+                <!-- Sound Effects -->
+                <LinearLayout
+                    android:id="@+id/itemSoundEffects"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:background="@drawable/bg_settings_card_selector"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
+                    android:nextFocusLeft="@+id/catVideoAudio"
+                    android:orientation="horizontal"
+                    android:padding="22dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/setting_sound_effects"
+                        android:textColor="@color/text_white"
+                        android:textSize="18sp" />
+
+                    <TextView
+                        android:id="@+id/valSoundEffects"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Ativado"
+                        android:textColor="@color/apple_green"
+                        android:textSize="17sp" />
+                </LinearLayout>
             </LinearLayout>
 
-            <!-- Resolution Setting Item -->
+            <!-- Panel 3: Screensaver -->
             <LinearLayout
-                android:id="@+id/itemResolution"
+                android:id="@+id/panelScreensaver"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:background="@drawable/bg_frosted_card"
-                android:clickable="true"
-                android:focusable="true"
-                android:orientation="horizontal"
-                android:padding="24dp">
+                android:orientation="vertical"
+                android:visibility="gone">
 
-                <TextView
-                    android:layout_width="0dp"
+                <!-- Screensaver Theme -->
+                <LinearLayout
+                    android:id="@+id/itemScreensaverType"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="@string/setting_resolution"
-                    android:textColor="@color/text_white"
-                    android:textSize="18sp" />
+                    android:background="@drawable/bg_settings_card_selector"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
+                    android:nextFocusLeft="@+id/catScreensaver"
+                    android:orientation="horizontal"
+                    android:padding="22dp">
 
-                <TextView
-                    android:id="@+id/valResolution"
-                    android:layout_width="wrap_content"
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/setting_screensaver_type"
+                        android:textColor="@color/text_white"
+                        android:textSize="18sp" />
+
+                    <TextView
+                        android:id="@+id/valScreensaverType"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Tomadas Aéreas Apple TV"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="17sp" />
+                </LinearLayout>
+
+                <!-- Timeout -->
+                <LinearLayout
+                    android:id="@+id/itemScreensaverTimeout"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="1080p 60Hz"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="16sp" />
+                    android:layout_marginTop="16dp"
+                    android:background="@drawable/bg_settings_card_selector"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
+                    android:nextFocusLeft="@+id/catScreensaver"
+                    android:orientation="horizontal"
+                    android:padding="22dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/setting_screensaver_timeout"
+                        android:textColor="@color/text_white"
+                        android:textSize="18sp" />
+
+                    <TextView
+                        android:id="@+id/valScreensaverTimeout"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="2 Minutos"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="17sp" />
+                </LinearLayout>
+
+                <!-- Ken Burns Motion -->
+                <LinearLayout
+                    android:id="@+id/itemKenBurns"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:background="@drawable/bg_settings_card_selector"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
+                    android:nextFocusLeft="@+id/catScreensaver"
+                    android:orientation="horizontal"
+                    android:padding="22dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/setting_ken_burns"
+                        android:textColor="@color/text_white"
+                        android:textSize="18sp" />
+
+                    <TextView
+                        android:id="@+id/valKenBurns"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Ativado"
+                        android:textColor="@color/apple_green"
+                        android:textSize="17sp" />
+                </LinearLayout>
             </LinearLayout>
 
-            <!-- Auto-start Boot Setting Item -->
+            <!-- Panel 4: General -->
             <LinearLayout
-                android:id="@+id/itemStartBoot"
+                android:id="@+id/panelGeneral"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:background="@drawable/bg_frosted_card"
-                android:clickable="true"
-                android:focusable="true"
-                android:orientation="horizontal"
-                android:padding="24dp">
+                android:orientation="vertical"
+                android:visibility="gone">
 
-                <TextView
-                    android:layout_width="0dp"
+                <!-- Start on Boot -->
+                <LinearLayout
+                    android:id="@+id/itemStartBoot"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="@string/setting_start_on_boot"
-                    android:textColor="@color/text_white"
-                    android:textSize="18sp" />
+                    android:background="@drawable/bg_settings_card_selector"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
+                    android:nextFocusLeft="@+id/catGeneral"
+                    android:orientation="horizontal"
+                    android:padding="22dp">
 
-                <TextView
-                    android:id="@+id/valStartBoot"
-                    android:layout_width="wrap_content"
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/setting_start_on_boot"
+                        android:textColor="@color/text_white"
+                        android:textSize="18sp" />
+
+                    <TextView
+                        android:id="@+id/valStartBoot"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Ativado"
+                        android:textColor="@color/apple_green"
+                        android:textSize="17sp" />
+                </LinearLayout>
+
+                <!-- Network SSID Info -->
+                <LinearLayout
+                    android:id="@+id/itemNetworkInfo"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Ativado"
-                    android:textColor="@color/apple_green"
-                    android:textSize="16sp" />
+                    android:layout_marginTop="16dp"
+                    android:background="@drawable/bg_settings_card_selector"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
+                    android:nextFocusLeft="@+id/catGeneral"
+                    android:orientation="horizontal"
+                    android:padding="22dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/setting_network_info"
+                        android:textColor="@color/text_white"
+                        android:textSize="18sp" />
+
+                    <TextView
+                        android:id="@+id/valNetworkInfo"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Wi-Fi Conectado"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="17sp" />
+                </LinearLayout>
+
+                <!-- About / Version -->
+                <LinearLayout
+                    android:id="@+id/itemAbout"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:background="@drawable/bg_settings_card_selector"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
+                    android:nextFocusLeft="@+id/catGeneral"
+                    android:orientation="horizontal"
+                    android:padding="22dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/setting_about"
+                        android:textColor="@color/text_white"
+                        android:textSize="18sp" />
+
+                    <TextView
+                        android:id="@+id/valAbout"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="tvOS 18.1 (UxPlay Engine)"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="17sp" />
+                </LinearLayout>
+
+                <!-- Factory Reset -->
+                <LinearLayout
+                    android:id="@+id/itemResetSettings"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:background="@drawable/bg_settings_card_selector"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
+                    android:nextFocusLeft="@+id/catGeneral"
+                    android:orientation="horizontal"
+                    android:padding="22dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/setting_reset_settings"
+                        android:textColor="#FF453A"
+                        android:textSize="18sp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Restaurar"
+                        android:textColor="#FF453A"
+                        android:textSize="17sp" />
+                </LinearLayout>
             </LinearLayout>
 
-        </LinearLayout>
+        </FrameLayout>
     </ScrollView>
 
 </LinearLayout>

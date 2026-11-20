@@ -349,8 +349,12 @@ static void cb_audio_set_coverart(void *cls, const void *buffer, int buflen) {
 
 static void cb_audio_stop_coverart_rendering(void *cls) {
     (void)cls;
-    LOGI("cb_audio_stop_coverart_rendering: Clearing cover art");
+    LOGI("cb_audio_stop_coverart_rendering: Audio stream stopped, clearing cover art & stopping audio");
     jni_on_cover_art(nullptr, 0);
+    jni_on_metadata("", "", "");
+    audio_renderer_stop();
+    g_audio_active.store(false);
+    update_airplay_state();
 }
 
 static void cb_audio_set_progress(void *cls, uint32_t *start, uint32_t *curr, uint32_t *end) {
@@ -429,8 +433,24 @@ static int cb_video_set_codec_and_size(void *cls, video_codec_t codec, unsigned 
 }
 
 static void cb_conn_feedback(void *cls) { (void)cls; }
-static void cb_conn_reset(void *cls, int reason) { (void)cls; (void)reason; }
-static void cb_video_reset(void *cls, reset_type_t reset_type) { (void)cls; (void)reset_type; }
+
+static void cb_conn_reset(void *cls, int reason) {
+    (void)cls;
+    LOGI("cb_conn_reset: AirPlay connection reset (reason=%d)", reason);
+    video_renderer_stop();
+    audio_renderer_stop();
+    g_video_active.store(false);
+    g_audio_active.store(false);
+    update_airplay_state();
+}
+
+static void cb_video_reset(void *cls, reset_type_t reset_type) {
+    (void)cls;
+    LOGI("cb_video_reset: Video stream reset/teardown (type=%d)", (int)reset_type);
+    video_renderer_stop();
+    g_video_active.store(false);
+    update_airplay_state();
+}
 
 // Logger bridge to Android Logcat
 static void uxplay_log_callback(void *cls, int level, const char *msg) {

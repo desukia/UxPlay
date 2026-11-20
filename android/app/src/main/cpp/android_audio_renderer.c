@@ -98,8 +98,14 @@ void audio_renderer_stop() {
 }
 
 void audio_renderer_render_buffer(unsigned char* data, int *data_len, unsigned short *seqnum, uint64_t *ntp_time) {
-    if (!s_is_running || !data || !data_len || *data_len <= 0) {
+    if (!data || !data_len || *data_len <= 0) {
         return;
+    }
+
+    if (!s_is_running) {
+        s_is_running = true;
+        jni_on_audio_state_changed(true);
+        LOGI("Audio rendering automatically engaged on incoming frame (compression_type=%d)", s_current_compression_type);
     }
 
     uint64_t timestamp = ntp_time ? *ntp_time : 0;

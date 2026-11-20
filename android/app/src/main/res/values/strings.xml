@@ -16,22 +16,31 @@
     <string name="pin_hint">Este código é temporário e protege suas transmissões.</string>
 
     <!-- Settings -->
-    <string name="settings_title">Ajustes da Apple TV</string>
-    <string name="category_general">Geral</string>
+    <string name="settings_title">Ajustes</string>
     <string name="category_airplay">AirPlay e HomeKit</string>
     <string name="category_video_audio">Vídeo e Áudio</string>
     <string name="category_screensaver">Protetor de Tela</string>
+    <string name="category_general">Geral</string>
     <string name="category_about">Sobre</string>
 
     <string name="setting_device_name">Nome da Apple TV</string>
     <string name="setting_require_pin">Exigir Código de Segurança</string>
-    <string name="setting_resolution">Resolução de Espelhamento</string>
-    <string name="setting_audio_offset">Sincronização de Áudio</string>
-    <string name="setting_screensaver_theme">Tema do Protetor Aéreo</string>
-    <string name="setting_start_on_boot">Iniciar com o Google TV</string>
+    <string name="setting_airplay_access">Permitir Acesso ao AirPlay</string>
+    <string name="setting_resolution">Resolução do AirPlay</string>
+    <string name="setting_video_format">Formato de Exibição</string>
+    <string name="setting_aspect_ratio">Calibração de Proporção</string>
+    <string name="setting_audio_format">Saída de Áudio</string>
+    <string name="setting_sound_effects">Efeitos Sonoros do Sistema</string>
+    <string name="setting_screensaver_type">Tema Aéreo</string>
+    <string name="setting_screensaver_timeout">Iniciar Protetor de Tela</string>
+    <string name="setting_ken_burns">Efeito de Movimento Ken Burns</string>
+    <string name="setting_start_on_boot">Iniciar Automaticamente</string>
+    <string name="setting_network_info">Informações de Rede</string>
+    <string name="setting_about">Versão do Sistema</string>
+    <string name="setting_reset_settings">Redefinir Ajustes de Fábrica</string>
 
     <string name="pin_never">Desativado</string>
-    <string name="pin_first_time">Apenas na Primeira Vez</string>
+    <string name="pin_first_time">Na Primeira Vez</string>
     <string name="pin_always">Sempre Exigir</string>
 
     <!-- Now Playing -->

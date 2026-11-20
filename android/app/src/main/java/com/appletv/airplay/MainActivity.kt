@@ -103,6 +103,16 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         observeAirPlayEngine()
     }
 
+    override fun onResume() {
+        super.onResume()
+        hideSystemUI()
+        val prefs = getSharedPreferences("apple_tv_prefs", Context.MODE_PRIVATE)
+        val name = prefs.getString("device_name", "Apple TV") ?: "Apple TV"
+        txtHeaderDeviceName.text = name
+        txtInstructionStep3.text = getString(R.string.instruction_step_3, name)
+        updateNetworkInfo()
+    }
+
     private fun initViews() {
         layoutAmbient = findViewById(R.id.layoutAmbient)
         layoutMirror = findViewById(R.id.layoutMirror)
@@ -279,6 +289,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     private fun showIdleScreen() {
         isMirroringActive = false
         layoutAmbient.visibility = View.VISIBLE
+        layoutMirror.visibility = View.VISIBLE
         layoutNowPlaying.visibility = View.GONE
         layoutPinDialog.visibility = View.GONE
         btnSettingsShortcut.visibility = View.VISIBLE
@@ -320,7 +331,8 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         isMirroringActive = false
         layoutPinDialog.visibility = View.GONE
         layoutAmbient.visibility = View.GONE
-        layoutMirror.visibility = View.GONE
+        // Keep layoutMirror visible underneath so the hardware Surface is never destroyed
+        layoutMirror.visibility = View.VISIBLE
         layoutNowPlaying.visibility = View.VISIBLE
         btnSettingsShortcut.visibility = View.GONE
 
