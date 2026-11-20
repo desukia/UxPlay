@@ -21,7 +21,6 @@ import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.widget.ImageView
-import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
@@ -67,13 +66,10 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     private lateinit var imgAlbumCover: ImageView
     private lateinit var imgDefaultMusicIcon: ImageView
     private lateinit var imgAmbientGlow: ImageView
-    private lateinit var txtAirPlayBadge: TextView
     private lateinit var txtTrackTitle: TextView
     private lateinit var txtArtistName: TextView
     private lateinit var txtAlbumName: TextView
-    private lateinit var audioProgressBar: ProgressBar
-    private lateinit var txtElapsedTime: TextView
-    private lateinit var txtRemainingTime: TextView
+    private lateinit var btnSettingsShortcut: View
 
     private val videoDecoder = AirPlayVideoDecoder()
     private val audioPlayer = AirPlayAudioPlayer()
@@ -135,13 +131,10 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         imgAlbumCover = findViewById(R.id.imgAlbumCover)
         imgDefaultMusicIcon = findViewById(R.id.imgDefaultMusicIcon)
         imgAmbientGlow = findViewById(R.id.imgAmbientGlow)
-        txtAirPlayBadge = findViewById(R.id.txtAirPlayBadge)
         txtTrackTitle = findViewById(R.id.txtTrackTitle)
         txtArtistName = findViewById(R.id.txtArtistName)
         txtAlbumName = findViewById(R.id.txtAlbumName)
-        audioProgressBar = findViewById(R.id.audioProgressBar)
-        txtElapsedTime = findViewById(R.id.txtElapsedTime)
-        txtRemainingTime = findViewById(R.id.txtRemainingTime)
+        btnSettingsShortcut = findViewById(R.id.btnSettingsShortcut)
 
         // Apply Ken Burns subtle zoom effect to ambient background
         startKenBurnsEffect()
@@ -172,7 +165,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     }
 
     private fun setupListeners() {
-        findViewById<View>(R.id.btnSettingsShortcut).setOnClickListener {
+        btnSettingsShortcut.setOnClickListener {
             startActivity(Intent(this, AppleTvSettingsActivity::class.java))
         }
     }
@@ -204,9 +197,6 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
             NativeAirPlay.clientInfoFlow.collectLatest { info ->
                 if (info.deviceName.isNotEmpty()) {
                     showHud("${info.deviceName} conectado")
-                    txtAirPlayBadge.text = "AirPlay • ${info.deviceName}"
-                } else {
-                    txtAirPlayBadge.text = "AirPlay Áudio"
                 }
             }
         }
@@ -237,30 +227,6 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                     }
                 } else {
                     resetCoverArt()
-                }
-            }
-        }
-
-        lifecycleScope.launch {
-            NativeAirPlay.progressFlow.collectLatest { progress ->
-                val pos = progress.positionMs
-                val dur = progress.durationMs
-                if (dur > 0) {
-                    val fraction = (pos.toDouble() / dur.toDouble()).coerceIn(0.0, 1.0)
-                    audioProgressBar.isIndeterminate = false
-                    audioProgressBar.progress = (fraction * 1000).toInt()
-                    txtElapsedTime.text = formatTime(pos)
-                    txtRemainingTime.text = "-" + formatTime((dur - pos).coerceAtLeast(0))
-                } else if (pos > 0) {
-                    audioProgressBar.isIndeterminate = false
-                    audioProgressBar.progress = 1000
-                    txtElapsedTime.text = formatTime(pos)
-                    txtRemainingTime.text = ""
-                } else {
-                    audioProgressBar.isIndeterminate = false
-                    audioProgressBar.progress = 0
-                    txtElapsedTime.text = "0:00"
-                    txtRemainingTime.text = "--:--"
                 }
             }
         }
@@ -315,6 +281,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         layoutAmbient.visibility = View.VISIBLE
         layoutNowPlaying.visibility = View.GONE
         layoutPinDialog.visibility = View.GONE
+        btnSettingsShortcut.visibility = View.VISIBLE
         videoDecoder.stop()
         audioPlayer.stop()
         resetCoverArt()
@@ -327,6 +294,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
 
     private fun showPinScreen() {
         layoutPinDialog.visibility = View.VISIBLE
+        btnSettingsShortcut.visibility = View.GONE
         soundManager.playPinDigitSound()
     }
 
@@ -336,6 +304,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         layoutAmbient.visibility = View.GONE
         layoutNowPlaying.visibility = View.GONE
         layoutMirror.visibility = View.VISIBLE
+        btnSettingsShortcut.visibility = View.GONE
 
         val surface = mirrorSurfaceView.holder.surface
         val (w, h) = NativeAirPlay.videoSizeFlow.value
@@ -353,6 +322,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         layoutAmbient.visibility = View.GONE
         layoutMirror.visibility = View.GONE
         layoutNowPlaying.visibility = View.VISIBLE
+        btnSettingsShortcut.visibility = View.GONE
 
         videoDecoder.stop()
         audioPlayer.start()
@@ -385,9 +355,6 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         imgAmbientGlow.animate().alpha(0f).setDuration(300).withEndAction {
             imgAmbientGlow.setImageDrawable(null)
         }.start()
-        audioProgressBar.progress = 0
-        txtElapsedTime.text = "0:00"
-        txtRemainingTime.text = "--:--"
     }
 
     private fun formatTime(ms: Long): String {
