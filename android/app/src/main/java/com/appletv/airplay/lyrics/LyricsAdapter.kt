@@ -21,9 +21,13 @@ class LyricsAdapter(
     private val items = mutableListOf<LyricLine>()
     private var activePosition: Int = -1
     private val sfProRounded: Typeface? = try {
-        ResourcesCompat.getFont(context, R.font.sf_pro_rounded)
+        Typeface.createFromAsset(context.assets, "fonts/sf_pro_rounded.ttf")
     } catch (e: Exception) {
-        Typeface.DEFAULT_BOLD
+        try {
+            ResourcesCompat.getFont(context, R.font.sf_pro_rounded)
+        } catch (e2: Exception) {
+            Typeface.DEFAULT_BOLD
+        }
     }
 
     fun submitList(newItems: List<LyricLine>) {
@@ -79,6 +83,7 @@ class LyricsAdapter(
 
         fun bind(lyric: LyricLine, position: Int, currentActive: Int) {
             txtLyricLine.text = lyric.text
+            sfProRounded?.let { txtLyricLine.typeface = it }
             txtLyricLine.pivotX = 0f
             txtLyricLine.pivotY = 24f
 

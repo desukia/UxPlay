@@ -7,6 +7,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.RenderEffect
 import android.graphics.Shader
+import android.graphics.Typeface
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
@@ -17,6 +18,7 @@ import android.os.Looper
 import android.os.SystemClock
 import android.util.DisplayMetrics
 import android.util.Log
+import android.util.TypedValue
 import android.view.KeyEvent
 import android.view.SurfaceHolder
 import android.view.View
@@ -26,6 +28,8 @@ import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.res.ResourcesCompat
+import androidx.core.graphics.drawable.RoundedBitmapDrawableFactory
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.LinearSmoothScroller
@@ -248,6 +252,43 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         volumeProgressBar = findViewById(R.id.volumeProgressBar)
         setupLyricsRecyclerView()
 
+        // Enable outline clipping for smooth rounded corners on cards & image views
+        findViewById<View>(R.id.cardAlbumCoverCentered)?.clipToOutline = true
+        findViewById<View>(R.id.cardAlbumCoverLyrics)?.clipToOutline = true
+        imgAlbumCoverCentered.clipToOutline = true
+        imgAlbumCoverLyrics.clipToOutline = true
+
+        // Load authentic Apple SF Pro fonts from assets/resources
+        val sfProRounded = try {
+            Typeface.createFromAsset(assets, "fonts/sf_pro_rounded.ttf")
+        } catch (e: Exception) {
+            try {
+                ResourcesCompat.getFont(this, R.font.sf_pro_rounded)
+            } catch (e2: Exception) {
+                Typeface.DEFAULT_BOLD
+            }
+        }
+        sfProRounded?.let {
+            txtTrackTitleCentered.typeface = it
+            txtTrackTitleLyrics.typeface = it
+            txtNoLyrics.typeface = it
+        }
+
+        val sfProDisplay = try {
+            Typeface.createFromAsset(assets, "fonts/sf_pro_display.ttf")
+        } catch (e: Exception) {
+            try {
+                ResourcesCompat.getFont(this, R.font.sf_pro_display)
+            } catch (e2: Exception) {
+                Typeface.DEFAULT
+            }
+        }
+        sfProDisplay?.let {
+            txtArtistNameCentered.typeface = it
+            txtAlbumNameCentered.typeface = it
+            txtArtistNameLyrics.typeface = it
+        }
+
         // Apply Ken Burns subtle zoom effect to ambient background
         startKenBurnsEffect()
     }
@@ -332,6 +373,14 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                     val trackKey = "$artist - $title"
                     if (trackKey != lastFetchedTrackKey) {
                         lastFetchedTrackKey = trackKey
+                        // Reset playback timeline & lyrics for the new song
+                        lastReceivedPositionMs = 0L
+                        lastProgressUpdateTimestamp = SystemClock.elapsedRealtime()
+                        currentActiveIndex = -1
+                        lyricsAdapter.submitList(emptyList())
+                        recyclerLyrics.visibility = View.GONE
+                        txtNoLyrics.visibility = View.GONE
+
                         val prefs = getSharedPreferences("apple_tv_prefs", Context.MODE_PRIVATE)
                         if (prefs.getBoolean("show_lyrics", true)) {
                             fetchLyrics(metadata.artist, metadata.title)
@@ -342,13 +391,24 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                         if (bytes.isNotEmpty()) {
                             val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
                             if (bitmap != null) {
+                                // Draw anti-aliased smooth rounded corners on bitmaps directly
+                                val radiusCentered = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 24f, resources.displayMetrics)
+                                val roundedCentered = RoundedBitmapDrawableFactory.create(resources, bitmap).apply {
+                                    cornerRadius = radiusCentered
+                                    isAntiAlias = true
+                                }
                                 imgDefaultMusicIconCentered.visibility = View.GONE
                                 imgAlbumCoverCentered.visibility = View.VISIBLE
-                                imgAlbumCoverCentered.setImageBitmap(bitmap)
+                                imgAlbumCoverCentered.setImageDrawable(roundedCentered)
 
+                                val radiusLyrics = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 22f, resources.displayMetrics)
+                                val roundedLyrics = RoundedBitmapDrawableFactory.create(resources, bitmap).apply {
+                                    cornerRadius = radiusLyrics
+                                    isAntiAlias = true
+                                }
                                 imgDefaultMusicIconLyrics.visibility = View.GONE
                                 imgAlbumCoverLyrics.visibility = View.VISIBLE
-                                imgAlbumCoverLyrics.setImageBitmap(bitmap)
+                                imgAlbumCoverLyrics.setImageDrawable(roundedLyrics)
 
                                 applyAmbientGlow(bitmap)
                             } else {
@@ -369,7 +429,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
 
         lifecycleScope.launch {
             NativeAirPlay.progressFlow.collectLatest { progress ->
-                if (progress.durationMs > 0 || progress.positionMs > 0) {
+                if (progress.durationMs > 0 || progress.positionMs >= 0) {
                     totalDurationMs = progress.durationMs
                     lastReceivedPositionMs = progress.positionMs
                     lastProgressUpdateTimestamp = SystemClock.elapsedRealtime()
@@ -554,11 +614,12 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     private fun fetchLyrics(artist: String, title: String) {
         lifecycleScope.launch {
             val lyrics = LyricsManager.fetchLyrics(artist, title)
-            if (!lyrics.isNullOrEmpty()) {
+            if (lyrics.isNotEmpty()) {
                 lyricsAdapter.submitList(lyrics)
                 currentActiveIndex = -1
                 recyclerLyrics.visibility = View.VISIBLE
                 txtNoLyrics.visibility = View.GONE
+                recyclerLyrics.scrollToPosition(0)
                 updateActiveLyricLine()
             } else {
                 lyricsAdapter.submitList(emptyList())
