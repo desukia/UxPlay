@@ -111,10 +111,10 @@ class LyricsAdapter(
                     clearBlur()
                 }
                 diff == -1 -> {
-                    // Line above: Fading into the past
+                    // Line directly above: Faintly fading out
                     txtLyricLine.setShadowLayer(0f, 0f, 0f, 0)
                     txtLyricLine.animate()
-                        .alpha(0.18f)
+                        .alpha(0.15f)
                         .scaleX(0.98f)
                         .scaleY(0.98f)
                         .setDuration(220)
@@ -122,15 +122,15 @@ class LyricsAdapter(
                     applyBlur(2.0f)
                 }
                 diff < -1 -> {
-                    // Lines further above: Almost completely faded
+                    // Lines further above: Completely faded out (invisible, so zero cutoff against top header!)
                     txtLyricLine.setShadowLayer(0f, 0f, 0f, 0)
                     txtLyricLine.animate()
-                        .alpha(0.08f)
-                        .scaleX(0.96f)
-                        .scaleY(0.96f)
-                        .setDuration(220)
+                        .alpha(0.0f)
+                        .scaleX(0.95f)
+                        .scaleY(0.95f)
+                        .setDuration(180)
                         .start()
-                    applyBlur(5.0f)
+                    clearBlur()
                 }
                 diff == 1 -> {
                     // Line 1 below: Dimmed white ~35%

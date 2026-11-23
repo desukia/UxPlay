@@ -392,7 +392,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                             val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
                             if (bitmap != null) {
                                 // Draw anti-aliased smooth rounded corners on bitmaps directly
-                                val radiusCentered = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 24f, resources.displayMetrics)
+                                val radiusCentered = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 20f, resources.displayMetrics)
                                 val roundedCentered = RoundedBitmapDrawableFactory.create(resources, bitmap).apply {
                                     cornerRadius = radiusCentered
                                     setAntiAlias(true)
@@ -401,7 +401,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                                 imgAlbumCoverCentered.visibility = View.VISIBLE
                                 imgAlbumCoverCentered.setImageDrawable(roundedCentered)
 
-                                val radiusLyrics = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 22f, resources.displayMetrics)
+                                val radiusLyrics = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 20f, resources.displayMetrics)
                                 val roundedLyrics = RoundedBitmapDrawableFactory.create(resources, bitmap).apply {
                                     cornerRadius = radiusLyrics
                                     setAntiAlias(true)
@@ -679,7 +679,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                 snapPreference: Int
             ): Int {
                 val boxHeight = boxEnd - boxStart
-                val targetCenter = boxStart + (boxHeight * 0.38f).toInt()
+                val targetCenter = boxStart + (boxHeight * 0.44f).toInt()
                 val viewCenter = viewStart + (viewEnd - viewStart) / 2
                 return targetCenter - viewCenter
             }
