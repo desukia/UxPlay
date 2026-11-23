@@ -23,6 +23,7 @@ import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.widget.ImageView
+import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
@@ -86,6 +87,11 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     private lateinit var recyclerLyrics: RecyclerView
     private lateinit var txtNoLyrics: TextView
     private lateinit var lyricsAdapter: LyricsAdapter
+    private lateinit var scrubberProgressBar: ProgressBar
+    private lateinit var txtTimeElapsed: TextView
+    private lateinit var txtTimeRemaining: TextView
+    private lateinit var volumeProgressBar: ProgressBar
+    private var totalDurationMs: Long = 0L
     private var isAudioStreamingActive = false
     private var currentActiveIndex: Int = -1
     private var lastReceivedPositionMs: Long = 0L
@@ -216,6 +222,10 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         btnSettingsShortcut = findViewById(R.id.btnSettingsShortcut)
         recyclerLyrics = findViewById(R.id.recyclerLyrics)
         txtNoLyrics = findViewById(R.id.txtNoLyrics)
+        scrubberProgressBar = findViewById(R.id.scrubberProgressBar)
+        txtTimeElapsed = findViewById(R.id.txtTimeElapsed)
+        txtTimeRemaining = findViewById(R.id.txtTimeRemaining)
+        volumeProgressBar = findViewById(R.id.volumeProgressBar)
         setupLyricsRecyclerView()
 
         // Apply Ken Burns subtle zoom effect to ambient background
@@ -323,6 +333,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         lifecycleScope.launch {
             NativeAirPlay.progressFlow.collectLatest { progress ->
                 if (progress.durationMs > 0 || progress.positionMs > 0) {
+                    totalDurationMs = progress.durationMs
                     lastReceivedPositionMs = progress.positionMs
                     lastProgressUpdateTimestamp = SystemClock.elapsedRealtime()
                     updateActiveLyricLine()
@@ -334,6 +345,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
             NativeAirPlay.volumeFlow.collectLatest { vol ->
                 audioPlayer.setVolume(vol)
                 val pct = (vol * 100).toInt()
+                volumeProgressBar.progress = pct.coerceIn(0, 100)
                 showHud("Volume: $pct%")
             }
         }
@@ -430,6 +442,9 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     private fun showAudioScreen() {
         isMirroringActive = false
         isAudioStreamingActive = true
+        if (lastProgressUpdateTimestamp == 0L) {
+            lastProgressUpdateTimestamp = SystemClock.elapsedRealtime()
+        }
         mainHandler.removeCallbacks(lyricsSyncRunnable)
         mainHandler.post(lyricsSyncRunnable)
         layoutPinDialog.visibility = View.GONE
@@ -499,14 +514,24 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     }
 
     private fun updateActiveLyricLine() {
-        val items = lyricsAdapter.getItems()
-        if (items.isEmpty()) return
-
         val elapsed = if (lastProgressUpdateTimestamp > 0) {
             SystemClock.elapsedRealtime() - lastProgressUpdateTimestamp
         } else 0L
 
         val currentMs = lastReceivedPositionMs + elapsed
+
+        txtTimeElapsed.text = formatTime(currentMs)
+        if (totalDurationMs > 0) {
+            val progress = ((currentMs.toFloat() / totalDurationMs.toFloat()) * 1000).toInt().coerceIn(0, 1000)
+            scrubberProgressBar.progress = progress
+            val remainingMs = (totalDurationMs - currentMs).coerceAtLeast(0)
+            txtTimeRemaining.text = "-${formatTime(remainingMs)}"
+        } else {
+            txtTimeRemaining.text = "--:--"
+        }
+
+        val items = lyricsAdapter.getItems()
+        if (items.isEmpty()) return
 
         var targetIndex = -1
         for (i in items.indices) {
@@ -537,11 +562,14 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                 boxEnd: Int,
                 snapPreference: Int
             ): Int {
-                return (boxStart + (boxEnd - boxStart) / 2) - (viewStart + (viewEnd - viewStart) / 2)
+                val boxHeight = boxEnd - boxStart
+                val targetCenter = boxStart + (boxHeight * 0.38f).toInt()
+                val viewCenter = viewStart + (viewEnd - viewStart) / 2
+                return targetCenter - viewCenter
             }
 
             override fun calculateSpeedPerPixel(displayMetrics: DisplayMetrics): Float {
-                return 150f / displayMetrics.densityDpi
+                return 180f / displayMetrics.densityDpi
             }
         }
         smoothScroller.targetPosition = targetPosition
@@ -552,8 +580,12 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         lastFetchedTrackKey = ""
         lastReceivedPositionMs = 0L
         lastProgressUpdateTimestamp = 0L
+        totalDurationMs = 0L
         currentActiveIndex = -1
         lyricsAdapter.submitList(emptyList())
+        scrubberProgressBar.progress = 0
+        txtTimeElapsed.text = "0:00"
+        txtTimeRemaining.text = "-0:00"
         recyclerLyrics.visibility = View.GONE
         txtNoLyrics.visibility = View.GONE
     }
