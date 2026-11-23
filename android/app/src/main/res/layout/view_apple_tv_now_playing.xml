@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#0A0A0C">
+    android:background="@color/black_obsidian">
 
     <!-- Layer 1: Blurred Ambient Glow from Album Art (Apple Music dynamic atmosphere) -->
     <ImageView
@@ -13,323 +13,236 @@
         android:alpha="0.55"
         android:scaleType="centerCrop" />
 
-    <!-- Layer 2: Apple Music Dark Scrim Vignette for deep contrast -->
+    <!-- Layer 2: Apple Dark Radial Scrim for Contrast -->
     <View
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#A606060A" />
+        android:background="#A608080C" />
 
-    <!-- Layer 3: Top Center Handle Capsule Indicator (iPhone Duo / Apple Music grabber) -->
+    <!-- Layer 3: Top Center Handle Capsule Indicator -->
     <View
         android:layout_width="36dp"
         android:layout_height="5dp"
         android:layout_gravity="top|center_horizontal"
-        android:layout_marginTop="14dp"
+        android:layout_marginTop="16dp"
         android:background="@drawable/bg_glass_pill"
         android:alpha="0.4" />
 
-    <!-- Layer 4: Apple Music Landscape Split Canvas -->
+    <!-- ========================================================================= -->
+    <!-- MODE A: Centered Cover Art Design ("Sem Letras - Do Jeito Que Tava Antes") -->
+    <!-- ========================================================================= -->
     <LinearLayout
+        android:id="@+id/layoutNowPlayingCentered"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:paddingStart="48dp"
+        android:paddingEnd="48dp"
+        android:visibility="gone">
+
+        <!-- Album Cover Art (tvOS centered card with elevation shadow) -->
+        <FrameLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal">
+
+            <androidx.cardview.widget.CardView
+                android:layout_width="380dp"
+                android:layout_height="380dp"
+                android:layout_gravity="center"
+                app:cardCornerRadius="28dp"
+                app:cardElevation="36dp"
+                app:cardBackgroundColor="#1A2228">
+
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent">
+
+                    <ImageView
+                        android:id="@+id/imgDefaultMusicIconCentered"
+                        android:layout_width="96dp"
+                        android:layout_height="96dp"
+                        android:layout_gravity="center"
+                        android:alpha="0.3"
+                        android:src="@drawable/ic_music_note"
+                        app:tint="@color/text_white" />
+
+                    <ImageView
+                        android:id="@+id/imgAlbumCoverCentered"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:scaleType="centerCrop" />
+
+                    <!-- Apple TV Glass Edge Stroke -->
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:background="@drawable/bg_pin_box"
+                        android:alpha="0.32" />
+                </FrameLayout>
+            </androidx.cardview.widget.CardView>
+        </FrameLayout>
+
+        <!-- Track & Artist Info Centered Underneath -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="32dp"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/txtTrackTitleCentered"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:fontFamily="@font/sf_pro_display"
+                android:gravity="center"
+                android:maxWidth="750dp"
+                android:maxLines="2"
+                android:text="Título da Música"
+                android:textAlignment="center"
+                android:textColor="@color/text_white"
+                android:textSize="34sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/txtArtistNameCentered"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:ellipsize="end"
+                android:fontFamily="@font/sf_pro_display"
+                android:gravity="center"
+                android:maxWidth="750dp"
+                android:maxLines="1"
+                android:text="Nome do Artista"
+                android:textAlignment="center"
+                android:textColor="#E0E0E0"
+                android:textSize="22sp" />
+
+            <TextView
+                android:id="@+id/txtAlbumNameCentered"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:ellipsize="end"
+                android:fontFamily="@font/sf_pro_display"
+                android:gravity="center"
+                android:maxWidth="750dp"
+                android:maxLines="1"
+                android:text="Álbum"
+                android:textAlignment="center"
+                android:textColor="#80FFFFFF"
+                android:textSize="16sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- ========================================================================= -->
+    <!-- MODE B: AMLL Apple Music Like Lyrics Design ("Com Letras")                -->
+    <!-- Left: Album Cover Card ONLY (centered). Right: Song Info + Synced Lyrics   -->
+    <!-- No microphone/transport/scrubber/queue buttons - pure clean design!       -->
+    <!-- ========================================================================= -->
+    <LinearLayout
+        android:id="@+id/layoutNowPlayingLyrics"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:baselineAligned="false"
         android:orientation="horizontal"
-        android:paddingStart="52dp"
-        android:paddingTop="32dp"
-        android:paddingEnd="44dp"
-        android:paddingBottom="24dp">
+        android:paddingStart="64dp"
+        android:paddingTop="36dp"
+        android:paddingEnd="48dp"
+        android:paddingBottom="36dp"
+        android:visibility="visible">
 
-        <!-- ================= LEFT COLUMN: Artwork, Track Info & Playback Controls ================= -->
-        <LinearLayout
+        <!-- Left Pane: Album Artwork Card (alone, vertically centered) -->
+        <FrameLayout
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:gravity="center_vertical"
-            android:orientation="vertical"
-            android:paddingEnd="28dp">
+            android:paddingEnd="32dp">
 
-            <!-- Album Artwork Card -->
-            <FrameLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="start">
+            <androidx.cardview.widget.CardView
+                android:layout_width="360dp"
+                android:layout_height="360dp"
+                android:layout_gravity="center"
+                app:cardBackgroundColor="#1A2026"
+                app:cardCornerRadius="26dp"
+                app:cardElevation="32dp">
 
-                <androidx.cardview.widget.CardView
-                    android:layout_width="310dp"
-                    android:layout_height="310dp"
-                    app:cardBackgroundColor="#1A2026"
-                    app:cardCornerRadius="24dp"
-                    app:cardElevation="28dp">
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent">
 
-                    <FrameLayout
+                    <ImageView
+                        android:id="@+id/imgDefaultMusicIconLyrics"
+                        android:layout_width="92dp"
+                        android:layout_height="92dp"
+                        android:layout_gravity="center"
+                        android:alpha="0.25"
+                        android:src="@drawable/ic_music_note"
+                        app:tint="@color/text_white" />
+
+                    <ImageView
+                        android:id="@+id/imgAlbumCoverLyrics"
                         android:layout_width="match_parent"
-                        android:layout_height="match_parent">
+                        android:layout_height="match_parent"
+                        android:scaleType="centerCrop" />
 
-                        <ImageView
-                            android:id="@+id/imgDefaultMusicIcon"
-                            android:layout_width="88dp"
-                            android:layout_height="88dp"
-                            android:layout_gravity="center"
-                            android:alpha="0.25"
-                            android:src="@drawable/ic_music_note"
-                            app:tint="@color/text_white" />
-
-                        <ImageView
-                            android:id="@+id/imgAlbumCover"
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:scaleType="centerCrop" />
-
-                        <!-- Subtle glass edge border -->
-                        <View
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:background="@drawable/bg_pin_box"
-                            android:alpha="0.25" />
-                    </FrameLayout>
-                </androidx.cardview.widget.CardView>
-            </FrameLayout>
-
-            <!-- Song Title, Artist & Action Icons -->
-            <LinearLayout
-                android:layout_width="310dp"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:id="@+id/txtTrackTitle"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:ellipsize="end"
-                        android:fontFamily="@font/sf_pro_rounded"
-                        android:maxLines="1"
-                        android:text="Título da Música"
-                        android:textColor="@color/text_white"
-                        android:textSize="21sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:id="@+id/txtArtistName"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="2dp"
-                        android:ellipsize="end"
-                        android:fontFamily="@font/sf_pro_display"
-                        android:maxLines="1"
-                        android:text="Nome do Artista"
-                        android:textColor="#B3FFFFFF"
-                        android:textSize="15sp" />
-                </LinearLayout>
-
-                <!-- Favorite Star & More Options -->
-                <ImageView
-                    android:id="@+id/btnFavoriteStar"
-                    android:layout_width="22dp"
-                    android:layout_height="22dp"
-                    android:layout_marginStart="12dp"
-                    android:layout_marginEnd="12dp"
-                    android:alpha="0.8"
-                    android:src="@drawable/ic_star_outline"
-                    app:tint="@color/text_white" />
-
-                <ImageView
-                    android:id="@+id/btnMoreOptions"
-                    android:layout_width="22dp"
-                    android:layout_height="22dp"
-                    android:alpha="0.8"
-                    android:src="@drawable/ic_more_dots"
-                    app:tint="@color/text_white" />
-            </LinearLayout>
-
-            <!-- Scrubber Track & Timestamps -->
-            <LinearLayout
-                android:layout_width="310dp"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:orientation="vertical">
-
-                <ProgressBar
-                    android:id="@+id/scrubberProgressBar"
-                    style="?android:attr/progressBarStyleHorizontal"
-                    android:layout_width="match_parent"
-                    android:layout_height="4dp"
-                    android:max="1000"
-                    android:progress="250"
-                    android:progressDrawable="@drawable/apple_tv_progress_bar" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:id="@+id/txtTimeElapsed"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:fontFamily="@font/sf_pro_display"
-                        android:text="0:00"
-                        android:textColor="#70FFFFFF"
-                        android:textSize="12sp" />
-
+                    <!-- Subtle glass edge border -->
                     <View
-                        android:layout_width="0dp"
-                        android:layout_height="1dp"
-                        android:layout_weight="1" />
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:background="@drawable/bg_pin_box"
+                        android:alpha="0.28" />
+                </FrameLayout>
+            </androidx.cardview.widget.CardView>
+        </FrameLayout>
 
-                    <TextView
-                        android:id="@+id/txtTimeRemaining"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:fontFamily="@font/sf_pro_display"
-                        android:text="-0:00"
-                        android:textColor="#70FFFFFF"
-                        android:textSize="12sp" />
-                </LinearLayout>
-            </LinearLayout>
-
-            <!-- Transport Control Row -->
-            <LinearLayout
-                android:layout_width="310dp"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:gravity="center"
-                android:orientation="horizontal">
-
-                <ImageView
-                    android:id="@+id/btnShuffle"
-                    android:layout_width="18dp"
-                    android:layout_height="18dp"
-                    android:alpha="0.4"
-                    android:src="@drawable/ic_shuffle"
-                    app:tint="@color/text_white" />
-
-                <ImageView
-                    android:id="@+id/btnPreviousTrack"
-                    android:layout_width="26dp"
-                    android:layout_height="26dp"
-                    android:layout_marginStart="26dp"
-                    android:alpha="0.85"
-                    android:src="@drawable/ic_skip_previous"
-                    app:tint="@color/text_white" />
-
-                <ImageView
-                    android:id="@+id/btnPlayPause"
-                    android:layout_width="38dp"
-                    android:layout_height="38dp"
-                    android:layout_marginStart="24dp"
-                    android:layout_marginEnd="24dp"
-                    android:alpha="1.0"
-                    android:src="@drawable/ic_pause"
-                    app:tint="@color/text_white" />
-
-                <ImageView
-                    android:id="@+id/btnNextTrack"
-                    android:layout_width="26dp"
-                    android:layout_height="26dp"
-                    android:layout_marginEnd="26dp"
-                    android:alpha="0.85"
-                    android:src="@drawable/ic_skip_next"
-                    app:tint="@color/text_white" />
-
-                <ImageView
-                    android:id="@+id/btnRepeat"
-                    android:layout_width="18dp"
-                    android:layout_height="18dp"
-                    android:alpha="0.4"
-                    android:src="@drawable/ic_repeat"
-                    app:tint="@color/text_white" />
-            </LinearLayout>
-
-            <!-- Volume Slider & AirPlay Info Row -->
-            <LinearLayout
-                android:layout_width="310dp"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
-
-                <ImageView
-                    android:layout_width="14dp"
-                    android:layout_height="14dp"
-                    android:alpha="0.5"
-                    android:src="@drawable/ic_speaker_low"
-                    app:tint="@color/text_white" />
-
-                <ProgressBar
-                    android:id="@+id/volumeProgressBar"
-                    style="?android:attr/progressBarStyleHorizontal"
-                    android:layout_width="0dp"
-                    android:layout_height="3dp"
-                    android:layout_marginStart="10dp"
-                    android:layout_marginEnd="10dp"
-                    android:layout_weight="1"
-                    android:max="100"
-                    android:progress="70"
-                    android:progressDrawable="@drawable/apple_tv_progress_bar" />
-
-                <ImageView
-                    android:layout_width="14dp"
-                    android:layout_height="14dp"
-                    android:alpha="0.5"
-                    android:src="@drawable/ic_speaker_high"
-                    app:tint="@color/text_white" />
-
-                <!-- AirPlay Connected Glyph Indicator -->
-                <ImageView
-                    android:layout_width="16dp"
-                    android:layout_height="16dp"
-                    android:layout_marginStart="18dp"
-                    android:alpha="0.65"
-                    android:src="@drawable/ic_airplay"
-                    app:tint="@color/text_white" />
-            </LinearLayout>
-
-        </LinearLayout>
-
-
-        <!-- ================= RIGHT COLUMN: Apple Music Live Synced Lyrics ================= -->
+        <!-- Right Pane: Track Title + Artist Header + AMLL Apple Music Like Lyrics -->
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_marginStart="16dp"
-            android:layout_weight="1.25"
+            android:layout_marginStart="24dp"
+            android:layout_weight="1.35"
             android:orientation="vertical">
 
-            <!-- Top Header of Lyrics Pane: Sing/Mic Button -->
+            <!-- Track Title and Artist Name at the top of the right column -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:gravity="end"
-                android:paddingTop="4dp"
-                android:paddingEnd="12dp">
+                android:layout_marginTop="28dp"
+                android:layout_marginBottom="16dp"
+                android:orientation="vertical">
 
-                <!-- Apple Music Sing (Karaoke) Button in Liquid Glass Pill -->
-                <FrameLayout
-                    android:id="@+id/btnMicKaraoke"
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
-                    android:background="@drawable/bg_liquid_glass_circle">
+                <TextView
+                    android:id="@+id/txtTrackTitleLyrics"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:fontFamily="@font/sf_pro_rounded"
+                    android:maxLines="2"
+                    android:text="Título da Música"
+                    android:textColor="@color/text_white"
+                    android:textSize="28sp"
+                    android:textStyle="bold" />
 
-                    <ImageView
-                        android:layout_width="18dp"
-                        android:layout_height="18dp"
-                        android:layout_gravity="center"
-                        android:alpha="0.9"
-                        android:src="@drawable/ic_mic_sparkle"
-                        app:tint="@color/text_white" />
-                </FrameLayout>
+                <TextView
+                    android:id="@+id/txtArtistNameLyrics"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:ellipsize="end"
+                    android:fontFamily="@font/sf_pro_display"
+                    android:maxLines="1"
+                    android:text="Nome do Artista"
+                    android:textColor="#B3FFFFFF"
+                    android:textSize="19sp" />
             </LinearLayout>
 
-            <!-- Time-Synced Lyrics Container -->
+            <!-- Scrolling Synced Lyrics or Empty Placeholder -->
             <FrameLayout
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
@@ -342,11 +255,10 @@
                     android:clipToPadding="false"
                     android:overScrollMode="never"
                     android:requiresFadingEdge="vertical"
-                    android:fadingEdgeLength="80dp"
-                    android:paddingTop="60dp"
-                    android:paddingBottom="240dp" />
+                    android:fadingEdgeLength="60dp"
+                    android:paddingTop="16dp"
+                    android:paddingBottom="220dp" />
 
-                <!-- Fallback when lyrics are unavailable -->
                 <TextView
                     android:id="@+id/txtNoLyrics"
                     android:layout_width="wrap_content"
@@ -360,55 +272,61 @@
                     android:visibility="gone" />
             </FrameLayout>
 
-            <!-- Bottom Action Row: Lyrics Bubble and Queue List -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="end"
-                android:paddingTop="6dp"
-                android:paddingEnd="16dp"
-                android:paddingBottom="4dp">
-
-                <!-- Selected Lyrics Quote Bubble -->
-                <FrameLayout
-                    android:id="@+id/btnLyricsBubble"
-                    android:layout_width="34dp"
-                    android:layout_height="34dp"
-                    android:layout_marginEnd="14dp"
-                    android:background="@drawable/bg_liquid_glass_circle">
-
-                    <ImageView
-                        android:layout_width="18dp"
-                        android:layout_height="18dp"
-                        android:layout_gravity="center"
-                        android:alpha="1.0"
-                        android:src="@drawable/ic_quote_bubble"
-                        app:tint="@color/text_white" />
-                </FrameLayout>
-
-                <!-- Queue List Button -->
-                <FrameLayout
-                    android:id="@+id/btnQueueList"
-                    android:layout_width="34dp"
-                    android:layout_height="34dp"
-                    android:background="@drawable/bg_liquid_glass_circle">
-
-                    <ImageView
-                        android:layout_width="18dp"
-                        android:layout_height="18dp"
-                        android:layout_gravity="center"
-                        android:alpha="0.6"
-                        android:src="@drawable/ic_queue_list"
-                        app:tint="@color/text_white" />
-                </FrameLayout>
-            </LinearLayout>
-
         </LinearLayout>
+
     </LinearLayout>
 
-    <!-- Legacy compatibility stub -->
+    <!-- Legacy compatibility stubs for unused view IDs -->
+    <TextView
+        android:id="@+id/txtTrackTitle"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/txtArtistName"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
+
     <TextView
         android:id="@+id/txtAlbumName"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
+
+    <ImageView
+        android:id="@+id/imgAlbumCover"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
+
+    <ImageView
+        android:id="@+id/imgDefaultMusicIcon"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
+
+    <ProgressBar
+        android:id="@+id/scrubberProgressBar"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/txtTimeElapsed"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/txtTimeRemaining"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
+
+    <ProgressBar
+        android:id="@+id/volumeProgressBar"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:visibility="gone" />

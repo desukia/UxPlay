@@ -38,7 +38,6 @@ class LyricsAdapter(
         val prev = activePosition
         activePosition = newPos
 
-        // Refresh range around previous and new position so depth of field blur and scale update smoothly
         val minPos = (minOf(prev, newPos) - 4).coerceAtLeast(0)
         val maxPos = (maxOf(prev, newPos) + 5).coerceAtMost(items.size - 1)
         if (maxPos >= minPos) {
@@ -88,6 +87,7 @@ class LyricsAdapter(
                 txtLyricLine.alpha = 0.35f
                 txtLyricLine.scaleX = 1.0f
                 txtLyricLine.scaleY = 1.0f
+                txtLyricLine.setShadowLayer(0f, 0f, 0f, 0)
                 clearBlur()
                 return
             }
@@ -95,72 +95,79 @@ class LyricsAdapter(
             val diff = position - currentActive
             when {
                 diff == 0 -> {
-                    // Active line: Bright pure white, enlarged, crystal clear
+                    // AMLL Active Line: Luminous pure white bloom + 1.05x scale
+                    txtLyricLine.setShadowLayer(22f, 0f, 0f, 0x90FFFFFF.toInt())
                     txtLyricLine.animate()
                         .alpha(1.0f)
                         .scaleX(1.05f)
                         .scaleY(1.05f)
-                        .setDuration(240)
+                        .setDuration(220)
                         .start()
                     clearBlur()
                 }
                 diff == -1 -> {
                     // Line above: Fading into the past
+                    txtLyricLine.setShadowLayer(0f, 0f, 0f, 0)
                     txtLyricLine.animate()
                         .alpha(0.18f)
                         .scaleX(0.98f)
                         .scaleY(0.98f)
-                        .setDuration(240)
+                        .setDuration(220)
                         .start()
-                    applyBlur(2.5f)
+                    applyBlur(2.0f)
                 }
                 diff < -1 -> {
                     // Lines further above: Almost completely faded
+                    txtLyricLine.setShadowLayer(0f, 0f, 0f, 0)
                     txtLyricLine.animate()
                         .alpha(0.08f)
                         .scaleX(0.96f)
                         .scaleY(0.96f)
-                        .setDuration(240)
+                        .setDuration(220)
                         .start()
                     applyBlur(5.0f)
                 }
                 diff == 1 -> {
                     // Line 1 below: Dimmed white ~35%
+                    txtLyricLine.setShadowLayer(0f, 0f, 0f, 0)
                     txtLyricLine.animate()
                         .alpha(0.35f)
                         .scaleX(1.0f)
                         .scaleY(1.0f)
-                        .setDuration(240)
+                        .setDuration(220)
                         .start()
                     clearBlur()
                 }
                 diff == 2 -> {
-                    // Line 2 below: White ~24% with radius 2pt blur
+                    // Line 2 below: Dimmed with light blur
+                    txtLyricLine.setShadowLayer(0f, 0f, 0f, 0)
                     txtLyricLine.animate()
-                        .alpha(0.24f)
+                        .alpha(0.22f)
                         .scaleX(0.98f)
                         .scaleY(0.98f)
-                        .setDuration(240)
+                        .setDuration(220)
                         .start()
                     applyBlur(2.0f)
                 }
                 diff == 3 -> {
-                    // Line 3 below: White ~15% with radius 4pt blur
+                    // Line 3 below: Dimmed with medium blur
+                    txtLyricLine.setShadowLayer(0f, 0f, 0f, 0)
                     txtLyricLine.animate()
-                        .alpha(0.15f)
+                        .alpha(0.14f)
                         .scaleX(0.96f)
                         .scaleY(0.96f)
-                        .setDuration(240)
+                        .setDuration(220)
                         .start()
                     applyBlur(4.0f)
                 }
                 else -> {
-                    // Line 4+ below: White ~8% with radius 6pt blur
+                    // Line 4+ below: Distant blur
+                    txtLyricLine.setShadowLayer(0f, 0f, 0f, 0)
                     txtLyricLine.animate()
-                        .alpha(0.08f)
+                        .alpha(0.07f)
                         .scaleX(0.95f)
                         .scaleY(0.95f)
-                        .setDuration(240)
+                        .setDuration(220)
                         .start()
                     applyBlur(6.0f)
                 }

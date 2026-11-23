@@ -3,20 +3,20 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:focusable="false"
-    android:clickable="false"
-    android:paddingTop="14dp"
-    android:paddingBottom="14dp"
-    android:paddingEnd="36dp">
+    android:clickable="true"
+    android:paddingTop="16dp"
+    android:paddingBottom="16dp"
+    android:paddingEnd="40dp">
 
     <TextView
         android:id="@+id/txtLyricLine"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:fontFamily="@font/sf_pro_rounded"
-        android:lineSpacingMultiplier="1.22"
-        android:letterSpacing="-0.01"
+        android:lineSpacingMultiplier="1.24"
+        android:letterSpacing="-0.015"
         android:textColor="#FFFFFF"
         android:alpha="0.30"
-        android:textSize="30sp"
+        android:textSize="29sp"
         android:textStyle="bold" />
 </FrameLayout>

@@ -392,6 +392,37 @@
                         android:textColor="@color/apple_green"
                         android:textSize="17sp" />
                 </LinearLayout>
+
+                <!-- Audio Now Playing Screen Design Style -->
+                <LinearLayout
+                    android:id="@+id/itemLyricsMode"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:background="@drawable/bg_settings_card_selector"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
+                    android:nextFocusLeft="@+id/catVideoAudio"
+                    android:orientation="horizontal"
+                    android:padding="22dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Estilo da Tela de Música"
+                        android:textColor="@color/text_white"
+                        android:textSize="18sp" />
+
+                    <TextView
+                        android:id="@+id/valLyricsMode"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Com Letras (Apple Music)"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="17sp" />
+                </LinearLayout>
             </LinearLayout>
 
             <!-- Panel 3: Screensaver -->

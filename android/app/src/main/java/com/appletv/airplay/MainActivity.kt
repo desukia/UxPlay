@@ -74,23 +74,31 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     private lateinit var hudOverlay: View
     private lateinit var txtHudText: TextView
 
-    // Now Playing Views
-    private lateinit var imgAlbumCover: ImageView
-    private lateinit var imgDefaultMusicIcon: ImageView
+    // Now Playing Views - Dual Layouts (Centered vs Lyrics)
+    private lateinit var layoutNowPlayingCentered: View
+    private lateinit var imgAlbumCoverCentered: ImageView
+    private lateinit var imgDefaultMusicIconCentered: ImageView
+    private lateinit var txtTrackTitleCentered: TextView
+    private lateinit var txtArtistNameCentered: TextView
+    private lateinit var txtAlbumNameCentered: TextView
+
+    private lateinit var layoutNowPlayingLyrics: View
+    private lateinit var imgAlbumCoverLyrics: ImageView
+    private lateinit var imgDefaultMusicIconLyrics: ImageView
+    private lateinit var txtTrackTitleLyrics: TextView
+    private lateinit var txtArtistNameLyrics: TextView
+
     private lateinit var imgAmbientGlow: ImageView
-    private lateinit var txtTrackTitle: TextView
-    private lateinit var txtArtistName: TextView
-    private lateinit var txtAlbumName: TextView
     private lateinit var btnSettingsShortcut: View
 
     // Apple Music Live Synced Lyrics Views & State
     private lateinit var recyclerLyrics: RecyclerView
     private lateinit var txtNoLyrics: TextView
     private lateinit var lyricsAdapter: LyricsAdapter
-    private lateinit var scrubberProgressBar: ProgressBar
-    private lateinit var txtTimeElapsed: TextView
-    private lateinit var txtTimeRemaining: TextView
-    private lateinit var volumeProgressBar: ProgressBar
+    private var scrubberProgressBar: ProgressBar? = null
+    private var txtTimeElapsed: TextView? = null
+    private var txtTimeRemaining: TextView? = null
+    private var volumeProgressBar: ProgressBar? = null
     private var totalDurationMs: Long = 0L
     private var isAudioStreamingActive = false
     private var currentActiveIndex: Int = -1
@@ -212,16 +220,28 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         hudOverlay = findViewById(R.id.hudOverlay)
         txtHudText = findViewById(R.id.txtHudText)
 
-        // Now Playing
-        imgAlbumCover = findViewById(R.id.imgAlbumCover)
-        imgDefaultMusicIcon = findViewById(R.id.imgDefaultMusicIcon)
+        // Now Playing - Shared
         imgAmbientGlow = findViewById(R.id.imgAmbientGlow)
-        txtTrackTitle = findViewById(R.id.txtTrackTitle)
-        txtArtistName = findViewById(R.id.txtArtistName)
-        txtAlbumName = findViewById(R.id.txtAlbumName)
         btnSettingsShortcut = findViewById(R.id.btnSettingsShortcut)
+
+        // Mode A: Centered Cover
+        layoutNowPlayingCentered = findViewById(R.id.layoutNowPlayingCentered)
+        imgAlbumCoverCentered = findViewById(R.id.imgAlbumCoverCentered)
+        imgDefaultMusicIconCentered = findViewById(R.id.imgDefaultMusicIconCentered)
+        txtTrackTitleCentered = findViewById(R.id.txtTrackTitleCentered)
+        txtArtistNameCentered = findViewById(R.id.txtArtistNameCentered)
+        txtAlbumNameCentered = findViewById(R.id.txtAlbumNameCentered)
+
+        // Mode B: AMLL Lyrics
+        layoutNowPlayingLyrics = findViewById(R.id.layoutNowPlayingLyrics)
+        imgAlbumCoverLyrics = findViewById(R.id.imgAlbumCoverLyrics)
+        imgDefaultMusicIconLyrics = findViewById(R.id.imgDefaultMusicIconLyrics)
+        txtTrackTitleLyrics = findViewById(R.id.txtTrackTitleLyrics)
+        txtArtistNameLyrics = findViewById(R.id.txtArtistNameLyrics)
         recyclerLyrics = findViewById(R.id.recyclerLyrics)
         txtNoLyrics = findViewById(R.id.txtNoLyrics)
+
+        // Compatibility views
         scrubberProgressBar = findViewById(R.id.scrubberProgressBar)
         txtTimeElapsed = findViewById(R.id.txtTimeElapsed)
         txtTimeRemaining = findViewById(R.id.txtTimeRemaining)
@@ -296,23 +316,40 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         lifecycleScope.launch {
             NativeAirPlay.metadataFlow.collectLatest { metadata ->
                 if (metadata.title.isNotEmpty()) {
-                    txtTrackTitle.text = metadata.title
-                    txtArtistName.text = metadata.artist.ifEmpty { "Desconhecido" }
-                    txtAlbumName.text = metadata.album
+                    val title = metadata.title
+                    val artist = metadata.artist.ifEmpty { "Desconhecido" }
+                    val album = metadata.album
 
-                    val trackKey = "${metadata.artist} - ${metadata.title}"
+                    // Mode A: Centered Info
+                    txtTrackTitleCentered.text = title
+                    txtArtistNameCentered.text = artist
+                    txtAlbumNameCentered.text = album
+
+                    // Mode B: AMLL Lyrics Info
+                    txtTrackTitleLyrics.text = title
+                    txtArtistNameLyrics.text = artist
+
+                    val trackKey = "$artist - $title"
                     if (trackKey != lastFetchedTrackKey) {
                         lastFetchedTrackKey = trackKey
-                        fetchLyrics(metadata.artist, metadata.title)
+                        val prefs = getSharedPreferences("apple_tv_prefs", Context.MODE_PRIVATE)
+                        if (prefs.getBoolean("show_lyrics", true)) {
+                            fetchLyrics(metadata.artist, metadata.title)
+                        }
                     }
 
                     metadata.coverArtBytes?.let { bytes ->
                         if (bytes.isNotEmpty()) {
                             val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
                             if (bitmap != null) {
-                                imgDefaultMusicIcon.visibility = View.GONE
-                                imgAlbumCover.visibility = View.VISIBLE
-                                imgAlbumCover.setImageBitmap(bitmap)
+                                imgDefaultMusicIconCentered.visibility = View.GONE
+                                imgAlbumCoverCentered.visibility = View.VISIBLE
+                                imgAlbumCoverCentered.setImageBitmap(bitmap)
+
+                                imgDefaultMusicIconLyrics.visibility = View.GONE
+                                imgAlbumCoverLyrics.visibility = View.VISIBLE
+                                imgAlbumCoverLyrics.setImageBitmap(bitmap)
+
                                 applyAmbientGlow(bitmap)
                             } else {
                                 resetCoverArt()
@@ -345,7 +382,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
             NativeAirPlay.volumeFlow.collectLatest { vol ->
                 audioPlayer.setVolume(vol)
                 val pct = (vol * 100).toInt()
-                volumeProgressBar.progress = pct.coerceIn(0, 100)
+                volumeProgressBar?.progress = pct.coerceIn(0, 100)
                 showHud("Volume: $pct%")
             }
         }
@@ -445,8 +482,21 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         if (lastProgressUpdateTimestamp == 0L) {
             lastProgressUpdateTimestamp = SystemClock.elapsedRealtime()
         }
-        mainHandler.removeCallbacks(lyricsSyncRunnable)
-        mainHandler.post(lyricsSyncRunnable)
+
+        val prefs = getSharedPreferences("apple_tv_prefs", Context.MODE_PRIVATE)
+        val showLyrics = prefs.getBoolean("show_lyrics", true)
+
+        if (showLyrics) {
+            layoutNowPlayingLyrics.visibility = View.VISIBLE
+            layoutNowPlayingCentered.visibility = View.GONE
+            mainHandler.removeCallbacks(lyricsSyncRunnable)
+            mainHandler.post(lyricsSyncRunnable)
+        } else {
+            layoutNowPlayingLyrics.visibility = View.GONE
+            layoutNowPlayingCentered.visibility = View.VISIBLE
+            mainHandler.removeCallbacks(lyricsSyncRunnable)
+        }
+
         layoutPinDialog.visibility = View.GONE
         layoutAmbient.visibility = View.GONE
         // Keep layoutMirror visible underneath so the hardware Surface is never destroyed
@@ -479,9 +529,14 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     }
 
     private fun resetCoverArt() {
-        imgAlbumCover.setImageDrawable(null)
-        imgAlbumCover.visibility = View.INVISIBLE
-        imgDefaultMusicIcon.visibility = View.VISIBLE
+        imgAlbumCoverCentered.setImageDrawable(null)
+        imgAlbumCoverCentered.visibility = View.INVISIBLE
+        imgDefaultMusicIconCentered.visibility = View.VISIBLE
+
+        imgAlbumCoverLyrics.setImageDrawable(null)
+        imgAlbumCoverLyrics.visibility = View.INVISIBLE
+        imgDefaultMusicIconLyrics.visibility = View.VISIBLE
+
         imgAmbientGlow.animate().alpha(0f).setDuration(300).withEndAction {
             imgAmbientGlow.setImageDrawable(null)
         }.start()
@@ -520,14 +575,14 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
 
         val currentMs = lastReceivedPositionMs + elapsed
 
-        txtTimeElapsed.text = formatTime(currentMs)
+        txtTimeElapsed?.text = formatTime(currentMs)
         if (totalDurationMs > 0) {
             val progress = ((currentMs.toFloat() / totalDurationMs.toFloat()) * 1000).toInt().coerceIn(0, 1000)
-            scrubberProgressBar.progress = progress
+            scrubberProgressBar?.progress = progress
             val remainingMs = (totalDurationMs - currentMs).coerceAtLeast(0)
-            txtTimeRemaining.text = "-${formatTime(remainingMs)}"
+            txtTimeRemaining?.text = "-${formatTime(remainingMs)}"
         } else {
-            txtTimeRemaining.text = "--:--"
+            txtTimeRemaining?.text = "--:--"
         }
 
         val items = lyricsAdapter.getItems()
@@ -583,9 +638,9 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         totalDurationMs = 0L
         currentActiveIndex = -1
         lyricsAdapter.submitList(emptyList())
-        scrubberProgressBar.progress = 0
-        txtTimeElapsed.text = "0:00"
-        txtTimeRemaining.text = "-0:00"
+        scrubberProgressBar?.progress = 0
+        txtTimeElapsed?.text = "0:00"
+        txtTimeRemaining?.text = "-0:00"
         recyclerLyrics.visibility = View.GONE
         txtNoLyrics.visibility = View.GONE
     }

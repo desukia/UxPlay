@@ -42,6 +42,7 @@ class AppleTvSettingsActivity : AppCompatActivity() {
     private lateinit var valAspectRatio: TextView
     private lateinit var valAudioFormat: TextView
     private lateinit var valSoundEffects: TextView
+    private lateinit var valLyricsMode: TextView
 
     // Screensaver Values
     private lateinit var valScreensaverType: TextView
@@ -97,6 +98,7 @@ class AppleTvSettingsActivity : AppCompatActivity() {
         valAspectRatio = findViewById(R.id.valAspectRatio)
         valAudioFormat = findViewById(R.id.valAudioFormat)
         valSoundEffects = findViewById(R.id.valSoundEffects)
+        valLyricsMode = findViewById(R.id.valLyricsMode)
 
         // Screensaver Panel Views
         valScreensaverType = findViewById(R.id.valScreensaverType)
@@ -126,6 +128,8 @@ class AppleTvSettingsActivity : AppCompatActivity() {
         valAudioFormat.text = "Lossless 44.1kHz Estéreo"
         val soundEffectsEnabled = prefs.getBoolean("sound_effects", true)
         valSoundEffects.text = if (soundEffectsEnabled) "Ativado" else "Desativado"
+        val showLyrics = prefs.getBoolean("show_lyrics", true)
+        valLyricsMode.text = if (showLyrics) "Com Letras (Apple Music)" else "Sem Letras (Capa Centralizada)"
 
         // Screensaver
         valScreensaverType.text = prefs.getString("screensaver_type", "Tomadas Aéreas Apple TV")
@@ -315,6 +319,21 @@ class AppleTvSettingsActivity : AppCompatActivity() {
             val updated = !current
             prefs.edit().putBoolean("sound_effects", updated).apply()
             valSoundEffects.text = if (updated) "Ativado" else "Desativado"
+        }
+
+        findViewById<View>(R.id.itemLyricsMode).setOnClickListener {
+            soundManager.playFocusSound()
+            val options = arrayOf("Com Letras (Apple Music)", "Sem Letras (Capa Centralizada)")
+            val current = if (prefs.getBoolean("show_lyrics", true)) 0 else 1
+            AlertDialog.Builder(this)
+                .setTitle("Estilo da Tela de Música")
+                .setSingleChoiceItems(options, current) { dialog, which ->
+                    val enableLyrics = (which == 0)
+                    prefs.edit().putBoolean("show_lyrics", enableLyrics).apply()
+                    valLyricsMode.text = options[which]
+                    dialog.dismiss()
+                }
+                .show()
         }
 
         // --- 3. SCREENSAVER LISTENERS ---
