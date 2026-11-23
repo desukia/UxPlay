@@ -395,7 +395,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                                 val radiusCentered = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 24f, resources.displayMetrics)
                                 val roundedCentered = RoundedBitmapDrawableFactory.create(resources, bitmap).apply {
                                     cornerRadius = radiusCentered
-                                    isAntiAlias = true
+                                    setAntiAlias(true)
                                 }
                                 imgDefaultMusicIconCentered.visibility = View.GONE
                                 imgAlbumCoverCentered.visibility = View.VISIBLE
@@ -404,7 +404,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                                 val radiusLyrics = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 22f, resources.displayMetrics)
                                 val roundedLyrics = RoundedBitmapDrawableFactory.create(resources, bitmap).apply {
                                     cornerRadius = radiusLyrics
-                                    isAntiAlias = true
+                                    setAntiAlias(true)
                                 }
                                 imgDefaultMusicIconLyrics.visibility = View.GONE
                                 imgAlbumCoverLyrics.visibility = View.VISIBLE
